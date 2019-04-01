@@ -787,7 +787,7 @@ U 1 1 5C771DA7
 P 2450 7300
 F 0 "C5" H 2542 7346 50  0000 L CNN
 F 1 "100n" H 2542 7255 50  0000 L CNN
-F 2 "Capacitor_THT:C_Axial_L3.8mm_D2.6mm_P10.00mm_Horizontal" H 2450 7300 50  0001 C CNN
+F 2 "Capacitor_THT:C_Axial_L3.8mm_D2.6mm_P7.50mm_Horizontal" H 2450 7300 50  0001 C CNN
 F 3 "~" H 2450 7300 50  0001 C CNN
 	1    2450 7300
 	1    0    0    -1  
@@ -1014,10 +1014,6 @@ $EndComp
 Wire Wire Line
 	2850 7450 2850 7400
 Wire Wire Line
-	2850 7150 2850 7200
-Wire Wire Line
-	2450 7150 2850 7150
-Wire Wire Line
 	2450 7450 2850 7450
 Connection ~ 2450 7150
 Connection ~ 2450 7450
@@ -1030,14 +1026,14 @@ Wire Wire Line
 	1650 7450 2050 7450
 NoConn ~ 1200 2050
 $Comp
-L Device:CP_Small C6
+L Device:CP_Small C9
 U 1 1 5C7A0AD1
-P 2850 7300
-F 0 "C6" H 2938 7346 50  0000 L CNN
-F 1 "10u" H 2938 7255 50  0000 L CNN
-F 2 "Capacitor_THT:CP_Radial_D5.0mm_P2.50mm" H 2850 7300 50  0001 C CNN
-F 3 "~" H 2850 7300 50  0001 C CNN
-	1    2850 7300
+P 3250 7300
+F 0 "C9" H 3338 7346 50  0000 L CNN
+F 1 "10u" H 3338 7255 50  0000 L CNN
+F 2 "Capacitor_THT:CP_Radial_D5.0mm_P2.50mm" H 3250 7300 50  0001 C CNN
+F 3 "~" H 3250 7300 50  0001 C CNN
+	1    3250 7300
 	1    0    0    -1  
 $EndComp
 Wire Wire Line
@@ -1660,4 +1656,29 @@ $EndComp
 Connection ~ 7900 5950
 Wire Wire Line
 	7900 5950 8100 5950
+$Comp
+L Device:C_Small C6
+U 1 1 5CA6EEE6
+P 2850 7300
+F 0 "C6" H 2942 7346 50  0000 L CNN
+F 1 "100n" H 2942 7255 50  0000 L CNN
+F 2 "Capacitor_THT:C_Axial_L3.8mm_D2.6mm_P7.50mm_Horizontal" H 2850 7300 50  0001 C CNN
+F 3 "~" H 2850 7300 50  0001 C CNN
+	1    2850 7300
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	3250 7150 3250 7200
+Wire Wire Line
+	2850 7150 3250 7150
+Wire Wire Line
+	2450 7150 2850 7150
+Connection ~ 2850 7150
+Wire Wire Line
+	2850 7150 2850 7200
+Wire Wire Line
+	2850 7450 3250 7450
+Wire Wire Line
+	3250 7450 3250 7400
+Connection ~ 2850 7450
 $EndSCHEMATC
