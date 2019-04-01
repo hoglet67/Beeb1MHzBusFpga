@@ -1,4 +1,5 @@
 EESchema Schematic File Version 4
+LIBS:BusAdapter-cache
 EELAYER 26 0
 EELAYER END
 $Descr A4 11693 8268
@@ -753,7 +754,7 @@ U 1 1 5C77110B
 P 1250 7300
 F 0 "C2" H 1342 7346 50  0000 L CNN
 F 1 "100n" H 1342 7255 50  0000 L CNN
-F 2 "Capacitor_THT:C_Axial_L5.1mm_D3.1mm_P10.00mm_Horizontal" H 1250 7300 50  0001 C CNN
+F 2 "Capacitor_THT:C_Axial_L3.8mm_D2.6mm_P10.00mm_Horizontal" H 1250 7300 50  0001 C CNN
 F 3 "~" H 1250 7300 50  0001 C CNN
 	1    1250 7300
 	1    0    0    -1  
@@ -764,7 +765,7 @@ U 1 1 5C771D25
 P 1650 7300
 F 0 "C3" H 1742 7346 50  0000 L CNN
 F 1 "100n" H 1742 7255 50  0000 L CNN
-F 2 "Capacitor_THT:C_Axial_L5.1mm_D3.1mm_P10.00mm_Horizontal" H 1650 7300 50  0001 C CNN
+F 2 "Capacitor_THT:C_Axial_L3.8mm_D2.6mm_P10.00mm_Horizontal" H 1650 7300 50  0001 C CNN
 F 3 "~" H 1650 7300 50  0001 C CNN
 	1    1650 7300
 	1    0    0    -1  
@@ -775,7 +776,7 @@ U 1 1 5C771D63
 P 2050 7300
 F 0 "C4" H 2142 7346 50  0000 L CNN
 F 1 "100n" H 2142 7255 50  0000 L CNN
-F 2 "Capacitor_THT:C_Axial_L5.1mm_D3.1mm_P10.00mm_Horizontal" H 2050 7300 50  0001 C CNN
+F 2 "Capacitor_THT:C_Axial_L3.8mm_D2.6mm_P10.00mm_Horizontal" H 2050 7300 50  0001 C CNN
 F 3 "~" H 2050 7300 50  0001 C CNN
 	1    2050 7300
 	1    0    0    -1  
@@ -786,7 +787,7 @@ U 1 1 5C771DA7
 P 2450 7300
 F 0 "C5" H 2542 7346 50  0000 L CNN
 F 1 "100n" H 2542 7255 50  0000 L CNN
-F 2 "Capacitor_THT:C_Axial_L5.1mm_D3.1mm_P10.00mm_Horizontal" H 2450 7300 50  0001 C CNN
+F 2 "Capacitor_THT:C_Axial_L3.8mm_D2.6mm_P10.00mm_Horizontal" H 2450 7300 50  0001 C CNN
 F 3 "~" H 2450 7300 50  0001 C CNN
 	1    2450 7300
 	1    0    0    -1  
@@ -890,44 +891,36 @@ Wire Wire Line
 $Comp
 L Analog_DAC:MCP4822 U5
 U 1 1 5C78B962
-P 8800 5400
-F 0 "U5" H 8400 5900 50  0000 C CNN
-F 1 "MCP4822" H 8400 5800 50  0000 C CNN
-F 2 "Package_DIP:DIP-8_W7.62mm_Socket" H 9600 5100 50  0001 C CNN
-F 3 "http://ww1.microchip.com/downloads/en/DeviceDoc/20002249B.pdf" H 9600 5100 50  0001 C CNN
-	1    8800 5400
+P 9350 5400
+F 0 "U5" H 8950 5900 50  0000 C CNN
+F 1 "MCP4822" H 8950 5800 50  0000 C CNN
+F 2 "Package_DIP:DIP-8_W7.62mm_Socket" H 10150 5100 50  0001 C CNN
+F 3 "http://ww1.microchip.com/downloads/en/DeviceDoc/20002249B.pdf" H 10150 5100 50  0001 C CNN
+	1    9350 5400
 	1    0    0    -1  
 $EndComp
 $Comp
 L power:+3.3V #PWR014
 U 1 1 5C78BC0F
-P 8800 5000
-F 0 "#PWR014" H 8800 4850 50  0001 C CNN
-F 1 "+3.3V" H 8815 5173 50  0000 C CNN
-F 2 "" H 8800 5000 50  0001 C CNN
-F 3 "" H 8800 5000 50  0001 C CNN
-	1    8800 5000
+P 9350 5000
+F 0 "#PWR014" H 9350 4850 50  0001 C CNN
+F 1 "+3.3V" H 9365 5173 50  0000 C CNN
+F 2 "" H 9350 5000 50  0001 C CNN
+F 3 "" H 9350 5000 50  0001 C CNN
+	1    9350 5000
 	1    0    0    -1  
 $EndComp
 $Comp
 L power:GND #PWR015
 U 1 1 5C78BC88
-P 8800 5900
-F 0 "#PWR015" H 8800 5650 50  0001 C CNN
-F 1 "GND" H 8805 5727 50  0000 C CNN
-F 2 "" H 8800 5900 50  0001 C CNN
-F 3 "" H 8800 5900 50  0001 C CNN
-	1    8800 5900
+P 9350 5900
+F 0 "#PWR015" H 9350 5650 50  0001 C CNN
+F 1 "GND" H 9355 5727 50  0000 C CNN
+F 2 "" H 9350 5900 50  0001 C CNN
+F 3 "" H 9350 5900 50  0001 C CNN
+	1    9350 5900
 	1    0    0    -1  
 $EndComp
-Text Label 8300 5400 2    50   ~ 0
-DAC_LDAC
-Text Label 8300 5500 2    50   ~ 0
-DAC_SDI
-Text Label 8300 5300 2    50   ~ 0
-DAC_SCK
-Text Label 8300 5600 2    50   ~ 0
-DAC_CS
 $Comp
 L Connector:Conn_Coaxial J6
 U 1 1 5C78C10F
@@ -999,17 +992,13 @@ Wire Wire Line
 Wire Wire Line
 	10100 5800 10200 5800
 Wire Wire Line
-	9300 5300 9600 5300
+	9850 5300 9850 5100
 Wire Wire Line
-	9600 5300 9600 5100
+	9850 5100 9900 5100
 Wire Wire Line
-	9600 5100 9900 5100
+	9850 5600 9850 5800
 Wire Wire Line
-	9300 5600 9600 5600
-Wire Wire Line
-	9600 5600 9600 5800
-Wire Wire Line
-	9600 5800 9900 5800
+	9850 5800 9900 5800
 Connection ~ 2050 7450
 $Comp
 L Device:C_Small C1
@@ -1017,7 +1006,7 @@ U 1 1 5C798365
 P 800 7300
 F 0 "C1" H 892 7346 50  0000 L CNN
 F 1 "100n" H 892 7255 50  0000 L CNN
-F 2 "Capacitor_THT:C_Axial_L5.1mm_D3.1mm_P10.00mm_Horizontal" H 800 7300 50  0001 C CNN
+F 2 "Capacitor_THT:C_Axial_L3.8mm_D2.6mm_P10.00mm_Horizontal" H 800 7300 50  0001 C CNN
 F 3 "~" H 800 7300 50  0001 C CNN
 	1    800  7300
 	1    0    0    -1  
@@ -1440,65 +1429,65 @@ Wire Wire Line
 $Comp
 L Switch:SW_Push SW1
 U 1 1 5C7C4C64
-P 9250 3100
-F 0 "SW1" H 9250 3385 50  0000 C CNN
-F 1 "SW_Push" H 9250 3294 50  0000 C CNN
-F 2 "Button_Switch_THT:SW_PUSH_6mm_H5mm" H 9250 3300 50  0001 C CNN
-F 3 "" H 9250 3300 50  0001 C CNN
-	1    9250 3100
+P 8150 5100
+F 0 "SW1" H 8150 5385 50  0000 C CNN
+F 1 "SW_Push" H 8150 5294 50  0000 C CNN
+F 2 "Button_Switch_THT:SW_PUSH_6mm_H5mm" H 8150 5300 50  0001 C CNN
+F 3 "" H 8150 5300 50  0001 C CNN
+	1    8150 5100
 	1    0    0    -1  
 $EndComp
 $Comp
 L Switch:SW_Push SW2
 U 1 1 5C7C4D3E
-P 9250 3600
-F 0 "SW2" H 9250 3885 50  0000 C CNN
-F 1 "SW_Push" H 9250 3794 50  0000 C CNN
-F 2 "Button_Switch_THT:SW_PUSH_6mm_H5mm" H 9250 3800 50  0001 C CNN
-F 3 "" H 9250 3800 50  0001 C CNN
-	1    9250 3600
+P 8150 5600
+F 0 "SW2" H 8150 5885 50  0000 C CNN
+F 1 "SW_Push" H 8150 5794 50  0000 C CNN
+F 2 "Button_Switch_THT:SW_PUSH_6mm_H5mm" H 8150 5800 50  0001 C CNN
+F 3 "" H 8150 5800 50  0001 C CNN
+	1    8150 5600
 	1    0    0    -1  
 $EndComp
-Text Label 8750 3100 2    50   ~ 0
+Text Label 7650 5100 2    50   ~ 0
 SW1
-Text Label 8750 3600 2    50   ~ 0
+Text Label 7650 5600 2    50   ~ 0
 SW2
 Wire Wire Line
-	9450 3100 9450 3600
+	8350 5100 8350 5600
 $Comp
 L power:GND #PWR021
 U 1 1 5C7C7AF9
-P 9450 3700
-F 0 "#PWR021" H 9450 3450 50  0001 C CNN
-F 1 "GND" H 9455 3527 50  0000 C CNN
-F 2 "" H 9450 3700 50  0001 C CNN
-F 3 "" H 9450 3700 50  0001 C CNN
-	1    9450 3700
+P 8350 5700
+F 0 "#PWR021" H 8350 5450 50  0001 C CNN
+F 1 "GND" H 8355 5527 50  0000 C CNN
+F 2 "" H 8350 5700 50  0001 C CNN
+F 3 "" H 8350 5700 50  0001 C CNN
+	1    8350 5700
 	1    0    0    -1  
 $EndComp
 Wire Wire Line
-	9450 3600 9450 3700
-Connection ~ 9450 3600
+	8350 5600 8350 5700
+Connection ~ 8350 5600
 $Comp
 L Device:R R8
 U 1 1 5C7D1F77
-P 8900 3100
-F 0 "R8" V 9100 3100 50  0000 L CNN
-F 1 "100R" V 9000 3050 50  0000 L CNN
-F 2 "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal" V 8830 3100 50  0001 C CNN
-F 3 "~" H 8900 3100 50  0001 C CNN
-	1    8900 3100
+P 7800 5100
+F 0 "R8" V 8000 5100 50  0000 L CNN
+F 1 "100R" V 7900 5050 50  0000 L CNN
+F 2 "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal" V 7730 5100 50  0001 C CNN
+F 3 "~" H 7800 5100 50  0001 C CNN
+	1    7800 5100
 	0    -1   -1   0   
 $EndComp
 $Comp
 L Device:R R9
 U 1 1 5C7D51EB
-P 8900 3600
-F 0 "R9" V 9100 3600 50  0000 L CNN
-F 1 "100R" V 9000 3550 50  0000 L CNN
-F 2 "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal" V 8830 3600 50  0001 C CNN
-F 3 "~" H 8900 3600 50  0001 C CNN
-	1    8900 3600
+P 7800 5600
+F 0 "R9" V 8000 5600 50  0000 L CNN
+F 1 "100R" V 7900 5550 50  0000 L CNN
+F 2 "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal" V 7730 5600 50  0001 C CNN
+F 3 "~" H 7800 5600 50  0001 C CNN
+	1    7800 5600
 	0    -1   -1   0   
 $EndComp
 $Comp
@@ -1515,71 +1504,32 @@ $EndComp
 $Comp
 L Connector_Generic:Conn_02x06_Odd_Even J10
 U 1 1 5CA1784D
-P 10300 3250
-F 0 "J10" H 10350 3667 50  0000 C CNN
-F 1 "Conn_02x06_Odd_Even" H 10350 3576 50  0000 C CNN
-F 2 "Connector_PinSocket_2.54mm:PinSocket_2x06_P2.54mm_Vertical" H 10300 3250 50  0001 C CNN
-F 3 "~" H 10300 3250 50  0001 C CNN
-	1    10300 3250
+P 8500 3950
+F 0 "J10" H 8550 4367 50  0000 C CNN
+F 1 "Conn_02x06_Odd_Even" H 8550 4276 50  0000 C CNN
+F 2 "Connector_PinSocket_2.54mm:PinSocket_2x06_P2.54mm_Vertical" H 8500 3950 50  0001 C CNN
+F 3 "~" H 8500 3950 50  0001 C CNN
+	1    8500 3950
 	-1   0    0    -1  
 $EndComp
-Text Label 10000 3550 2    50   ~ 0
+Text Label 8200 4250 2    50   ~ 0
 GND
-Text Label 10500 3550 0    50   ~ 0
+Text Label 8700 4250 0    50   ~ 0
 +3V3
-NoConn ~ 10000 3250
-NoConn ~ 10500 3250
-NoConn ~ 10500 3350
-Text Label 10500 3150 0    50   ~ 0
-DAC_SCK
-Text Label 10500 3050 0    50   ~ 0
-DAC_LDAC
-Text Label 10000 3150 2    50   ~ 0
-DAC_SDI
-Text Label 10000 3050 2    50   ~ 0
-DAC_CS
-Text Label 10000 3350 2    50   ~ 0
+Text Label 8200 4150 2    50   ~ 0
 SW1
-Text Label 10000 3450 2    50   ~ 0
+Text Label 8700 4150 0    50   ~ 0
 SW2
-$Comp
-L Device:R R10
-U 1 1 5CA2B6A2
-P 10800 3750
-F 0 "R10" H 10870 3796 50  0000 L CNN
-F 1 "1K0" H 10870 3705 50  0000 L CNN
-F 2 "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal" V 10730 3750 50  0001 C CNN
-F 3 "~" H 10800 3750 50  0001 C CNN
-	1    10800 3750
-	1    0    0    -1  
-$EndComp
-$Comp
-L power:GND #PWR022
-U 1 1 5CA2B86C
-P 10800 3900
-F 0 "#PWR022" H 10800 3650 50  0001 C CNN
-F 1 "GND" H 10805 3727 50  0000 C CNN
-F 2 "" H 10800 3900 50  0001 C CNN
-F 3 "" H 10800 3900 50  0001 C CNN
-	1    10800 3900
-	1    0    0    -1  
-$EndComp
-Wire Wire Line
-	10800 3600 10800 3450
-Wire Wire Line
-	10500 3450 10800 3450
-Text Label 10700 3450 0    50   ~ 0
-HSWAPEN
 $Comp
 L Connector_Generic:Conn_02x02_Odd_Even J11
 U 1 1 5CA3DF80
-P 10050 4400
-F 0 "J11" H 10100 4617 50  0000 C CNN
-F 1 "Conn_02x02_Odd_Even" H 10100 4526 50  0000 C CNN
-F 2 "Connector_PinHeader_2.54mm:PinHeader_2x02_P2.54mm_Vertical" H 10050 4400 50  0001 C CNN
-F 3 "~" H 10050 4400 50  0001 C CNN
-	1    10050 4400
-	1    0    0    -1  
+P 10150 4400
+F 0 "J11" H 10200 4617 50  0000 C CNN
+F 1 "Conn_02x02_Odd_Even" H 10200 4526 50  0000 C CNN
+F 2 "Connector_PinHeader_2.54mm:PinHeader_2x02_P2.54mm_Vertical" H 10150 4400 50  0001 C CNN
+F 3 "~" H 10150 4400 50  0001 C CNN
+	1    10150 4400
+	-1   0    0    -1  
 $EndComp
 Text Label 9850 4500 2    50   ~ 0
 PMOD1_6
@@ -1605,4 +1555,63 @@ Wire Wire Line
 Connection ~ 10400 4500
 Wire Wire Line
 	10400 4500 10400 4400
+Text Label 10000 3350 2    50   ~ 0
+GND
+Text Label 10000 3450 2    50   ~ 0
++3V3
+Text Label 10500 3350 0    50   ~ 0
+GND
+Text Label 10500 3450 0    50   ~ 0
++3V3
+Text Label 10500 2950 0    50   ~ 0
+PMOD2_4
+Text Label 10500 3050 0    50   ~ 0
+PMOD2_5
+Text Label 10500 3150 0    50   ~ 0
+PMOD2_6
+Text Label 10500 3250 0    50   ~ 0
+PMOD2_7
+Text Label 10000 3050 2    50   ~ 0
+PMOD2_1
+Text Label 10000 3150 2    50   ~ 0
+PMOD2_2
+Text Label 10000 3250 2    50   ~ 0
+PMOD2_3
+Text Label 10000 2950 2    50   ~ 0
+PMOD2_0
+$Comp
+L Connector_Generic:Conn_02x06_Top_Bottom J12
+U 1 1 5CA59D08
+P 10200 3150
+F 0 "J12" H 10250 3567 50  0000 C CNN
+F 1 "Conn_02x06_Top_Bottom" H 10250 3476 50  0000 C CNN
+F 2 "footprints:PinSocket_2x06_P2.54mm_Horizontal" H 10200 3150 50  0001 C CNN
+F 3 "~" H 10200 3150 50  0001 C CNN
+	1    10200 3150
+	1    0    0    -1  
+$EndComp
+Text Label 8200 4050 2    50   ~ 0
+PMOD2_4
+Text Label 8200 3950 2    50   ~ 0
+PMOD2_5
+Text Label 8200 3850 2    50   ~ 0
+PMOD2_6
+Text Label 8200 3750 2    50   ~ 0
+PMOD2_7
+Text Label 8700 4050 0    50   ~ 0
+PMOD2_0
+Text Label 8700 3950 0    50   ~ 0
+PMOD2_1
+Text Label 8700 3850 0    50   ~ 0
+PMOD2_2
+Text Label 8700 3750 0    50   ~ 0
+PMOD2_3
+Text Label 8850 5600 2    50   ~ 0
+PMOD2_4
+Text Label 8850 5300 2    50   ~ 0
+PMOD2_5
+Text Label 8850 5500 2    50   ~ 0
+PMOD2_6
+Text Label 8850 5400 2    50   ~ 0
+PMOD2_7
 $EndSCHEMATC
