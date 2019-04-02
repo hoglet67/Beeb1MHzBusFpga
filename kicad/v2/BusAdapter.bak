@@ -110,7 +110,7 @@ U 1 1 5C751EFF
 P 1500 1950
 F 0 "J1" H 1550 900 50  0000 C CNN
 F 1 "Conn_02x17_Odd_Even" H 1550 1000 50  0000 C CNN
-F 2 "Connector_IDC:IDC-Header_2x17_P2.54mm_Horizontal_Lock" H 1500 1950 50  0001 C CNN
+F 2 "footprints:IDC-Header_2x17_P2.54mm_Horizontal_Lock" H 1500 1950 50  0001 C CNN
 F 3 "~" H 1500 1950 50  0001 C CNN
 	1    1500 1950
 	-1   0    0    1   
