@@ -24,9 +24,14 @@ oswrch = &ffee
    LDA #&00
    STA &0287
 
-   ;; Test the break type
+   ;; Test the break type, exit if soft break
    LDA &028D
    BEQ exit
+
+   ;; Test the screen mode, exit if not mode 7
+   LDA &355
+   CMP #7
+   BNE exit
 
    ;; Save the current cursor location
    LDA &0319
