@@ -75,4 +75,4 @@ oswrch = &ffee
 
    EQUW reset1
 
-   SAVE "fdfe_test.bin",&FD00,&FE00
+   SAVE "owl.bin",&FD00,&FE00
