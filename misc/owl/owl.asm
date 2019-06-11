@@ -8,6 +8,10 @@ oswrch = &ffee
    ;; Clear the interrupt reset interrupt
    LDA &FCFF
 
+   ;; Test the break type, exit if soft break
+   LDA &028D
+   BEQ exit
+
    ;; Use the BREAK intercept vecter to run some code later
    ;; TODO: Should we save/chain the old vector?
    LDA #&4C
@@ -23,10 +27,6 @@ oswrch = &ffee
    ;; Clear the break intercept bector
    LDA #&00
    STA &0287
-
-   ;; Test the break type, exit if soft break
-   LDA &028D
-   BEQ exit
 
    ;; Test the screen mode, exit if not mode 7
    LDA &355
