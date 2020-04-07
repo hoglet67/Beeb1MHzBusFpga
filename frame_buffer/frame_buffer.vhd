@@ -45,13 +45,14 @@ end frame_buffer;
 
 architecture Behavioral of frame_buffer is
 
+    constant op_fill       : std_logic_vector(7 downto 0) := x"00";
+
     -- VGA timings are approximage
     -- H: 640 + 16 + 96 + 48 = 800
     -- V: 480 + 11 + 2 + 31  = 524
     -- 25,000,000 / 800 / 524 = 59.64Hz
 
     constant BORDER        : integer := 1;
-
 
     constant H_ACTIVE      : integer := 640;
     constant H_SYNC_START  : integer := H_ACTIVE + 16;
@@ -94,7 +95,6 @@ architecture Behavioral of frame_buffer is
     signal h_counter       : unsigned(9 downto 0);
     signal v_counter       : unsigned(9 downto 0);
 
-
     -- Blitter registers
     signal bl_src_addr     : std_logic_vector(18 downto 0);
     signal bl_src_xinc     : std_logic_vector(15 downto 0);
@@ -105,6 +105,7 @@ architecture Behavioral of frame_buffer is
     signal bl_xcount       : std_logic_vector(9 downto 0);
     signal bl_ycount       : std_logic_vector(9 downto 0);
     signal bl_op           : std_logic_vector(7 downto 0);
+    signal bl_param        : std_logic_vector(7 downto 0);
 
     -- Sign extended versions
     signal bl_src_xinc_ext : std_logic_vector(18 downto 0);
@@ -142,6 +143,8 @@ architecture Behavioral of frame_buffer is
     signal bl_start1     : std_logic;
     signal bl_start2     : std_logic;
 
+    signal bl_fill_op    : std_logic;
+
 begin
 
     ------------------------------------------------
@@ -153,6 +156,9 @@ begin
     bl_src_yinc_ext <= bl_src_yinc(15) & bl_src_yinc(15) & bl_src_yinc(15) & bl_src_yinc;
     bl_dst_xinc_ext <= bl_dst_xinc(15) & bl_dst_xinc(15) & bl_dst_xinc(15) & bl_dst_xinc;
     bl_dst_yinc_ext <= bl_dst_yinc(15) & bl_dst_yinc(15) & bl_dst_yinc(15) & bl_dst_yinc;
+
+    -- Decode the blitter ops
+    bl_fill_op <= '1' when bl_op = op_fill else '0';
 
     process(clk_video)
     begin
@@ -171,7 +177,11 @@ begin
                         tmp_dst_addr    <= std_logic_vector(unsigned(bl_dst_addr) + unsigned(bl_dst_yinc_ext));
                         tmp_xcount      <= bl_xcount;
                         tmp_ycount      <= bl_ycount;
-                        bl_state        <= rd_pending;
+                        if bl_fill_op = '1' then
+                            bl_state    <= wr_pending;
+                        else
+                            bl_state    <= rd_pending;
+                        end if;
                     end if;
 
                 when rd_pending =>
@@ -186,27 +196,27 @@ begin
 
                 when inc =>
                     if unsigned(tmp_xcount) = 0 then
-                        if unsigned(tmp_ycount) = 0 then
-                            -- Done
-                            bl_state <= idle;
-                        else
-                            -- Next line
-                            tmp_xcount      <= bl_xcount;
-                            tmp_ycount      <= std_logic_vector(unsigned(tmp_ycount) - 1);
-                            bl_ram_src_addr <= tmp_src_addr;
-                            bl_ram_dst_addr <= tmp_dst_addr;
-                            tmp_src_addr    <= std_logic_vector(unsigned(tmp_src_addr) + unsigned(bl_src_yinc_ext));
-                            tmp_dst_addr    <= std_logic_vector(unsigned(tmp_dst_addr) + unsigned(bl_dst_yinc_ext));
-                            bl_state        <= rd_pending;
-                        end if;
+                        -- Next line
+                        tmp_xcount      <= bl_xcount;
+                        tmp_ycount      <= std_logic_vector(unsigned(tmp_ycount) - 1);
+                        bl_ram_src_addr <= tmp_src_addr;
+                        bl_ram_dst_addr <= tmp_dst_addr;
+                        tmp_src_addr    <= std_logic_vector(unsigned(tmp_src_addr) + unsigned(bl_src_yinc_ext));
+                        tmp_dst_addr    <= std_logic_vector(unsigned(tmp_dst_addr) + unsigned(bl_dst_yinc_ext));
                     else
                         -- Same line
                         tmp_xcount      <= std_logic_vector(unsigned(tmp_xcount) - 1);
                         bl_ram_src_addr <= std_logic_vector(unsigned(bl_ram_src_addr) + unsigned(bl_src_xinc_ext));
                         bl_ram_dst_addr <= std_logic_vector(unsigned(bl_ram_dst_addr) + unsigned(bl_dst_xinc_ext));
-                        bl_state        <= rd_pending;
                     end if;
-
+                    -- Next state
+                    if unsigned(tmp_xcount) = 0 and unsigned(tmp_ycount) = 0 then
+                        bl_state <= idle;
+                    elsif bl_fill_op = '1' then
+                        bl_state <= wr_pending;
+                    else
+                        bl_state <= rd_pending;
+                    end if;
             end case;
         end if;
     end process;
@@ -326,7 +336,11 @@ begin
             elsif bl_state = wr_pending and bl_wr_done = '0' then
                 -- Blitter Write Cycle
                 ram_addr    <= bl_ram_dst_addr;
-                ram_data    <= bl_data;
+                if bl_fill_op = '1' then
+                    ram_data <= bl_param;
+                else
+                    ram_data <= bl_data;
+                end if;
                 ram_cel     <= '0';
                 ram_oel     <= '1';
                 ram_wel     <= '0';
@@ -447,6 +461,8 @@ begin
                     when x"13" =>
                         bl_ycount(9 downto 8) <= bus_data(1 downto 0);
                     when x"14" =>
+                        bl_param <= bus_data;
+                    when x"15" =>
                         bl_op <= bus_data;
                         bl_start <= '1';
                     when others =>
@@ -494,7 +510,8 @@ begin
                    "000000" & bl_xcount(9 downto 8) when bl_selected = '1' and pgfd_n = '0' and bus_addr = x"11" and rnw = '1' else
                               bl_ycount(7 downto 0) when bl_selected = '1' and pgfd_n = '0' and bus_addr = x"12" and rnw = '1' else
                    "000000" & bl_ycount(9 downto 8) when bl_selected = '1' and pgfd_n = '0' and bus_addr = x"13" and rnw = '1' else
-                                              bl_op when bl_selected = '1' and pgfd_n = '0' and bus_addr = x"14" and rnw = '1' else
+                                           bl_param when bl_selected = '1' and pgfd_n = '0' and bus_addr = x"14" and rnw = '1' else
+                                              bl_op when bl_selected = '1' and pgfd_n = '0' and bus_addr = x"15" and rnw = '1' else
                              tmp_xcount(7 downto 0) when bl_selected = '1' and pgfd_n = '0' and bus_addr = x"18" and rnw = '1' else
                   "000000" & tmp_xcount(9 downto 8) when bl_selected = '1' and pgfd_n = '0' and bus_addr = x"19" and rnw = '1' else
                              tmp_ycount(7 downto 0) when bl_selected = '1' and pgfd_n = '0' and bus_addr = x"1A" and rnw = '1' else
