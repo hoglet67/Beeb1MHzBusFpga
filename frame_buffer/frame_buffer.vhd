@@ -46,6 +46,7 @@ end frame_buffer;
 architecture Behavioral of frame_buffer is
 
     constant op_fill       : std_logic_vector(7 downto 0) := x"00";
+    constant op_char       : std_logic_vector(7 downto 0) := x"01";
 
     -- VGA timings are approximage
     -- H: 640 + 16 + 96 + 48 = 800
@@ -97,11 +98,11 @@ architecture Behavioral of frame_buffer is
 
     -- Blitter registers
     signal bl_src_addr     : std_logic_vector(18 downto 0);
-    signal bl_src_xinc     : std_logic_vector(15 downto 0);
-    signal bl_src_yinc     : std_logic_vector(15 downto 0);
+    signal bl_src_xinc     : std_logic_vector(15 downto 0); -- treated as signed
+    signal bl_src_yinc     : std_logic_vector(15 downto 0); -- treated as signed
     signal bl_dst_addr     : std_logic_vector(18 downto 0);
-    signal bl_dst_xinc     : std_logic_vector(15 downto 0);
-    signal bl_dst_yinc     : std_logic_vector(15 downto 0);
+    signal bl_dst_xinc     : std_logic_vector(15 downto 0); -- treated as signed
+    signal bl_dst_yinc     : std_logic_vector(15 downto 0); -- treated as signed
     signal bl_xcount       : std_logic_vector(9 downto 0);
     signal bl_ycount       : std_logic_vector(9 downto 0);
     signal bl_op           : std_logic_vector(7 downto 0);
@@ -144,6 +145,13 @@ architecture Behavioral of frame_buffer is
     signal bl_start2     : std_logic;
 
     signal bl_fill_op    : std_logic;
+    signal bl_char_op    : std_logic;
+
+    signal rom_data      : std_logic_vector(7 downto 0);
+    signal char_data     : std_logic_vector(7 downto 0);
+    signal char_row      : std_logic_vector(2 downto 0);
+    signal char_col      : std_logic_vector(2 downto 0);
+    signal char_addr     : std_logic_vector(9 downto 0);
 
 begin
 
@@ -159,6 +167,7 @@ begin
 
     -- Decode the blitter ops
     bl_fill_op <= '1' when bl_op = op_fill else '0';
+    bl_char_op <= '1' when bl_op = op_char else '0';
 
     process(clk_video)
     begin
@@ -251,6 +260,22 @@ begin
     end process;
 
     ------------------------------------------------
+    -- Character
+    ------------------------------------------------
+
+    -- Counts run 7..0
+    char_col  <= std_logic_vector(unsigned(tmp_xcount(2 downto 0)));
+    char_row  <= std_logic_vector(7 - unsigned(tmp_ycount(2 downto 0)));
+    char_addr <= bl_param(6 downto 0) & char_row;
+
+    char_rom_inst : entity work.char_rom port map (
+        clock    => clk_video,
+        addressA => char_addr,
+        QA       => rom_data);
+
+    char_data <= x"ff" when rom_data(to_integer(unsigned(char_col))) = '1' else x"00";
+
+    ------------------------------------------------
     -- Video Timing
     ------------------------------------------------
     process(clk_video)
@@ -338,6 +363,8 @@ begin
                 ram_addr    <= bl_ram_dst_addr;
                 if bl_fill_op = '1' then
                     ram_data <= bl_param;
+                elsif bl_char_op = '1' then
+                    ram_data <= char_data;
                 else
                     ram_data <= bl_data;
                 end if;
