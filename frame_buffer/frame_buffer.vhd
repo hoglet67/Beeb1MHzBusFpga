@@ -404,7 +404,7 @@ begin
                     else
                         red   <= ram_data(2 downto 0) & '0';
                         green <= ram_data(5 downto 3) & '0';
-                        blue  <= ram_data(7 downto 6) & "00";
+                        blue  <= ram_data(7 downto 6) & ram_dout(6) & '0';
                     end if;
                 else
                     red   <= (others => '0');
