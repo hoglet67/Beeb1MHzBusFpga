@@ -40,7 +40,7 @@ entity frame_buffer is
         sw1          : in    std_logic;
         sw2          : in    std_logic;
         led          : out   std_logic
-    );
+        );
 end frame_buffer;
 
 architecture Behavioral of frame_buffer is
@@ -83,6 +83,7 @@ architecture Behavioral of frame_buffer is
     signal bl_selected     : std_logic;
 
     signal clk_video       : std_logic;
+    signal clk_video_n     : std_logic;
     signal clk_div         : std_logic;
 
     signal red             : std_logic_vector(3 downto 0);
@@ -154,6 +155,11 @@ architecture Behavioral of frame_buffer is
     signal char_addr     : std_logic_vector(9 downto 0);
 
     signal bl_wr_done_lookahead : std_logic;
+
+    signal ram_wel_int   : std_logic;
+    signal ram_doel      : std_logic_vector (7 downto 0);
+    signal ram_din       : std_logic_vector (7 downto 0);
+    signal ram_dout      : std_logic_vector (7 downto 0);
 
 begin
 
@@ -253,6 +259,7 @@ begin
     ------------------------------------------------
 
     clk_video <= clk50;
+    clk_video_n <= not clk50;
 
     process(clk_video)
     begin
@@ -311,7 +318,7 @@ begin
                     active <= '0';
                 end if;
                 if h_counter < BORDER or h_counter >= H_ACTIVE - BORDER or
-                   v_counter < BORDER or v_counter >= V_ACTIVE - BORDER then
+                    v_counter < BORDER or v_counter >= V_ACTIVE - BORDER then
                     outline <= '1';
                 else
                     outline <= '0';
@@ -344,61 +351,61 @@ begin
             if clk_div = '0' and active = '1' then
                 -- Video Read Cycle
                 ram_addr        <= std_logic_vector(v_counter(8 downto 0)) & std_logic_vector(h_counter);
-                ram_data        <= (others => 'Z');
+                ram_din         <= (others => '0');
                 ram_cel         <= '0';
                 ram_oel         <= '0';
-                ram_wel         <= '1';
+                ram_wel_int     <= '1';
             elsif cpu_rd_pending2 /= cpu_rd_pending1 then
                 -- CPU Read Cycle
                 ram_addr        <= cpu_addr;
-                ram_data        <= (others => 'Z');
+                ram_din         <= (others => '0');
                 ram_cel         <= '0';
                 ram_oel         <= '0';
-                ram_wel         <= '1';
+                ram_wel_int     <= '1';
                 cpu_rd_done     <= '1';
                 cpu_rd_pending2 <= cpu_rd_pending1;
             elsif cpu_wr_pending2 /= cpu_wr_pending1 then
                 -- CPU Write Cycle
                 ram_addr        <= cpu_addr;
-                ram_data        <= cpu_wr_data;
+                ram_din         <= cpu_wr_data;
                 ram_cel         <= '0';
                 ram_oel         <= '1';
-                ram_wel         <= '0';
+                ram_wel_int     <= '0';
                 cpu_wr_pending2 <= cpu_wr_pending1;
             elsif bl_state = wr_pending and bl_wr_done = '0' then
                 -- Blitter Write Cycle
                 ram_addr    <= bl_ram_dst_addr;
                 if bl_fill_op = '1' then
-                    ram_data <= bl_param;
+                    ram_din  <= bl_param;
                 elsif bl_char_op = '1' then
-                    ram_data <= char_data;
+                    ram_din  <= char_data;
                 else
-                    ram_data <= bl_data;
+                    ram_din  <= bl_data;
                 end if;
                 ram_cel     <= '0';
                 ram_oel     <= '1';
-                ram_wel     <= '0';
+                ram_wel_int <= '0';
                 bl_wr_done  <= '1';
             elsif bl_state = rd_pending and bl_rd_done = '0' then
                 -- Blitter Read Cycle
                 ram_addr    <= bl_ram_src_addr;
-                ram_data    <= (others => 'Z');
+                ram_din     <= (others => '0');
                 ram_cel     <= '0';
                 ram_oel     <= '0';
-                ram_wel     <= '1';
+                ram_wel_int <= '1';
                 bl_rd_done  <= '1';
             else
                 -- IDLE cycle
                 ram_addr     <= (others => '0');
-                ram_data     <= (others => 'Z');
+                ram_din      <= (others => '0');
                 ram_cel      <= '1';
                 ram_oel      <= '1';
-                ram_wel      <= '1';
+                ram_wel_int  <= '1';
             end if;
 
             -- Handle the data from a blitter read cycle
             if bl_rd_done = '1' then
-                bl_data <= ram_data;
+                bl_data <= ram_dout;
             end if;
 
             -- Handle the data from a video read cycle
@@ -409,9 +416,9 @@ begin
                         green <= x"F";
                         blue  <= x"F";
                     else
-                        red   <= ram_data(2 downto 0) & '0';
-                        green <= ram_data(5 downto 3) & '0';
-                        blue  <= ram_data(7 downto 6) & "00";
+                        red   <= ram_dout(2 downto 0) & '0';
+                        green <= ram_dout(5 downto 3) & '0';
+                        blue  <= ram_dout(7 downto 6) & "00";
                     end if;
                 else
                     red   <= (others => '0');
@@ -422,12 +429,54 @@ begin
 
             -- Handle the data from a CPU read cycle
             if cpu_rd_done = '1' then
-                cpu_rd_data <= ram_data;
+                cpu_rd_data <= ram_dout;
                 cpu_rd_done <= '0';
             end if;
 
         end if;
     end process;
+
+    ------------------------------------------------
+    -- SRAM I/O Drivers
+    ------------------------------------------------
+
+    ram_wel_ddr : ODDR2
+        port map (
+            Q  => ram_wel,
+            C0 => clk_video_n,
+            C1 => clk_video,
+            CE => '1',
+            D0 => ram_wel_int,
+            D1 => '1',
+            R  => '0',
+            S  => '0'
+            );
+
+    gen_sram_data_io: for i in 0 to 7 generate
+        -- replicate the ODDR2 for each data bit, because of limited routing
+        oddr2x : ODDR2
+            port map (
+                Q  => ram_doel(i),
+                C0 => clk_video_n,
+                C1 => clk_video,
+                CE => '1',
+                D0 => ram_wel_int,
+                D1 => '1',
+                R  => '0',
+                S  => '0'
+                );
+        -- the active low tristate connects directly to the IOBUFT in the same IOB
+        iobufx : IOBUF
+            generic map (
+                DRIVE => 8
+                )
+            port map (
+                O  => ram_dout(i),
+                I  => ram_din(i),
+                IO => ram_data(i),
+                T  => ram_doel(i)
+                );
+    end generate;
 
     ------------------------------------------------
     -- 1MHz Bus Interface
