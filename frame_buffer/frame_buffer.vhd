@@ -105,8 +105,8 @@ architecture Behavioral of frame_buffer is
     signal bl_dst_yinc     : std_logic_vector(15 downto 0); -- treated as signed
     signal bl_xcount       : std_logic_vector(9 downto 0);
     signal bl_ycount       : std_logic_vector(9 downto 0);
-    signal bl_op           : std_logic_vector(7 downto 0);
     signal bl_param        : std_logic_vector(7 downto 0);
+    signal bl_op           : std_logic_vector(7 downto 0);
 
     -- Sign extended versions
     signal bl_src_xinc_ext : std_logic_vector(18 downto 0);
@@ -152,6 +152,8 @@ architecture Behavioral of frame_buffer is
     signal char_row      : std_logic_vector(2 downto 0);
     signal char_col      : std_logic_vector(2 downto 0);
     signal char_addr     : std_logic_vector(9 downto 0);
+
+    signal bl_wr_done_lookahead : std_logic;
 
 begin
 
@@ -199,7 +201,7 @@ begin
                     end if;
 
                 when wr_pending =>
-                    if bl_wr_done = '1' then
+                    if bl_wr_done_lookahead = '1' then
                         bl_state      <= inc;
                     end if;
 
@@ -321,6 +323,11 @@ begin
     ------------------------------------------------
     -- SRAM Interface
     ------------------------------------------------
+
+    -- Indicates when the next cycle could be used for the blitter write cycle
+    -- This eliminates one cycle of latency between the two state machines, and
+    -- doubles the fill rate from 12.5Mpixels/sec to 25.0Mpixels/sec.
+    bl_wr_done_lookahead <= '1' when (clk_div = '1' or active = '0') and (cpu_rd_pending1 = cpu_rd_pending2) and (cpu_wr_pending1 = cpu_wr_pending2) else '0';
 
     process(clk_video)
     begin
