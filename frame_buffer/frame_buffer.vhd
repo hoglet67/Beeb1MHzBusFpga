@@ -334,7 +334,7 @@ begin
     -- Indicates when the next cycle could be used for the blitter write cycle
     -- This eliminates one cycle of latency between the two state machines, and
     -- doubles the fill rate from 12.5Mpixels/sec to 25.0Mpixels/sec.
-    bl_wr_done_lookahead <= '1' when (clk_div = '1' or active = '0') and (cpu_rd_pending1 = cpu_rd_pending2) and (cpu_wr_pending1 = cpu_wr_pending2) else '0';
+    bl_wr_done_lookahead <= '1' when clk_div = '1' and (cpu_rd_pending1 = cpu_rd_pending2) and (cpu_wr_pending1 = cpu_wr_pending2) else '0';
 
     process(clk_video)
     begin
