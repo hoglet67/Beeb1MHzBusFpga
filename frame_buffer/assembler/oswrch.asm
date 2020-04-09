@@ -1,8 +1,22 @@
-wrcvec=&020E
+wrcvec      = &020E
 
-blit_ptr=&80
-blit_len=22
-blit_status=&FD1C
+blit_ptr       = &80
+blit_char_addr = &82
+
+blit_len       = 22
+
+bl_src_addr    = &FD00
+bl_src_xinc    = &FD04
+bl_src_yinc    = &FD06
+bl_dst_addr    = &FD08
+bl_dst_xinc    = &FD0C
+bl_dst_yinc    = &FD0E
+bl_xcount      = &FD10
+bl_ycount      = &FD12
+bl_param       = &FD14
+bl_op          = &FD15
+bl_status      = &FD1C
+
 
 org &2800
 
@@ -37,6 +51,24 @@ org &2800
     TSX
     LDA &103,X
 
+    CMP #&20
+    BCC vdu_control
+
+    CMP #&7F
+    BCS vdu_control
+
+    JSR vdu_char
+    JSR cursor_right
+
+.oswrchexit
+    PLA
+    TAY
+    PLA
+    TAX
+    PLA
+    JMP (oldwrcvec)
+
+.vdu_control
     CMP #&08
     BEQ vdu_08
     CMP #&09
@@ -52,27 +84,13 @@ org &2800
     CMP #&1E
     BEQ vdu_1e
     CMP #&7F
-    BEQ vdu_7f
+    BNE oswrchexit
 
-    CMP #&20
-    BCC oswrchexit
-
-    CMP #&7F
-    BCS oswrchexit
-
-    STA blit_char_param
-    LDX #LO(blit_char)
-    LDY #HI(blit_char)
-    JSR blit
-    JSR cursor_right
-
-.oswrchexit
-    PLA
-    TAY
-    PLA
-    TAX
-    PLA
-    JMP (oldwrcvec)
+.vdu_7f
+    JSR cursor_left
+    LDA #&20
+    JSR vdu_char
+    JMP oswrchexit
 
 .vdu_08
     JSR cursor_left
@@ -107,13 +125,46 @@ org &2800
     JSR cursor_sol
     JMP oswrchexit
 
-.vdu_7f
-    JSR cursor_left
-    LDA #&20
-    STA blit_char_param
-    LDX #LO(blit_char)
-    LDY #HI(blit_char)
-    JMP blit
+    ;; Unrolled/Optimised version of blit for chars
+    ;; 125 cycles rather than 432 cycles
+
+.vdu_char
+{
+    LDX #&C7                    ; 2
+    STX &FCFF                   ; 6
+    LDX #&FF                    ; 2
+    STX &FCFE                   ; 6
+
+;; Wait for Blitter to become free
+.loop
+    LDX bl_status               ; 6
+    BNE loop                    ; 2
+
+    STA bl_param                ; 6
+    LDA blit_char_addr          ; 3
+    STA bl_dst_addr             ; 6
+    LDA blit_char_addr + 1      ; 3
+    STA bl_dst_addr + 1         ; 6
+    LDA blit_char_addr + 2      ; 3
+    STA bl_dst_addr + 2         ; 6
+    LDA #4                      ; 2
+    LDX #0                      ; 2
+    LDY #1                      ; 2
+    STY bl_dst_xinc      ; &01  ; 6
+    STX bl_dst_xinc + 1  ; &00  ; 6
+    STX bl_dst_yinc      ; &00  ; 6
+    STA bl_dst_yinc + 1  ; &04  ; 6
+    LDA #7                      ; 2
+    STA bl_xcount        ; &07  ; 6
+    STX bl_xcount + 1    ; &00  ; 6
+    STA bl_ycount        ; &07  ; 6
+    STX bl_ycount + 1    ; &00  ; 6
+    STY bl_op            ; &01  ; 6
+    RTS                         ; 6
+                                ; ---
+                                ; 125
+                                ; ---
+}
 
 .cursor_left
 {
@@ -249,28 +300,31 @@ org &2800
 
 .blit
 {
-    STX blit_ptr
-    STY blit_ptr + 1
-    LDA #&C7
-    STA &FCFF
-    LDA #&FF
-    STA &FCFE
+    STX blit_ptr        ; 3
+    STY blit_ptr + 1    ; 3
+    LDA #&C7            ; 2
+    STA &FCFF           ; 6
+    LDA #&FF            ; 2
+    STA &FCFE           ; 6
 
 ;; Wait for Blitter to become free
 .loop1
-    LDA blit_status
-    BNE loop1
+    LDA bl_status       ; 6
+    BNE loop1           ; 2
 
 ;; Write the Blitter Block
-    LDY #&00
+    LDY #&00            ; 2
 .loop2
-    LDA (blit_ptr), Y
-    STA &FD00,Y
-    INY
-    CPY #blit_len
-    BNE loop2
+    LDA (blit_ptr), Y   ; 5
+    STA &FD00,Y         ; 6
+    INY                 ; 2
+    CPY #blit_len       ; 2
+    BNE loop2           ; 3 x 22
 
-    RTS
+    RTS                 ; 6
+                        ; ---
+                        ; 432
+                        ; ---
 }
 
 .oldwrcvec
@@ -311,20 +365,6 @@ org &2800
     EQUW 8-1       ; bl_ycount
     EQUB &00       ; bl_param = block
     EQUB &00       ; bl_op    = fill_op
-
-.blit_char
-    EQUD &00000000 ; bl_src_addr (unused)
-    EQUW &0000     ; bl_src_xinc (unused)
-    EQUW &0000     ; bl_src_yinc (unused)
-.blit_char_addr
-    EQUD &00000000 ; bl_dst_addr (top left)
-    EQUW &0001     ; bl_dst_xinc
-    EQUW &0400     ; bl_dst_yinc
-    EQUW 8-1       ; bl_xcount
-    EQUW 8-1       ; bl_ycount
-.blit_char_param
-    EQUB &00       ; bl_param = block
-    EQUB &01       ; bl_op    = char_op
 
 .blit_scroll_up
     EQUD &00002000 ; bl_src_addr
