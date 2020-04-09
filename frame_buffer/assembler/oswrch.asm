@@ -348,7 +348,7 @@ org &2800
     EQUW &0400     ; bl_dst_yinc
     EQUW 640-1     ; bl_xcount
     EQUW 472-1     ; bl_ycount
-    EQUB &00       ; bl_param
+    EQUB &FF       ; bl_param = mask
     EQUB &FF       ; bl_op    = copy_op
 
 .blit_scroll_down
@@ -360,7 +360,7 @@ org &2800
     EQUW &FC00     ; bl_dst_yinc
     EQUW 640-1     ; bl_xcount
     EQUW 472-1     ; bl_ycount
-    EQUB &00       ; bl_param
+    EQUB &FF       ; bl_param = mask
     EQUB &FF       ; bl_op    = copy_op
 
 .end

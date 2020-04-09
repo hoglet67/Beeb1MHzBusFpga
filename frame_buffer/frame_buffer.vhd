@@ -47,6 +47,16 @@ architecture Behavioral of frame_buffer is
 
     constant op_fill       : std_logic_vector(7 downto 0) := x"00";
     constant op_char       : std_logic_vector(7 downto 0) := x"01";
+    constant op_copy       : std_logic_vector(7 downto 0) := x"FF";
+
+    -- Copy S to D using a mask
+    -- D = (S and mask) | (D and not mask)
+    --
+    -- If mask is 0xFF then D does not need to be read
+    --
+    -- e.g. Copy with mask 0xF0
+    -- Bits 7..4 foreground
+    -- Bits 3..0 background
 
     -- VGA timings are approximage
     -- H: 640 + 16 + 96 + 48 = 800
@@ -130,15 +140,18 @@ architecture Behavioral of frame_buffer is
     -- Blitter state
     type bl_state_type is (
         idle,
-        rd_pending,
+        rd1_pending,
+        rd2_pending,
         wr_pending,
         inc
         );
 
     signal bl_state      : bl_state_type;
-    signal bl_rd_done    : std_logic;
+    signal bl_rd1_done   : std_logic;
+    signal bl_rd2_done   : std_logic;
     signal bl_wr_done    : std_logic;
-    signal bl_data       : std_logic_vector(7 downto 0);
+    signal bl_op1        : std_logic_vector(7 downto 0);
+    signal bl_op2        : std_logic_vector(7 downto 0);
     signal bl_debug      : std_logic_vector(7 downto 0);
 
     signal bl_start      : std_logic;
@@ -147,6 +160,8 @@ architecture Behavioral of frame_buffer is
 
     signal bl_fill_op    : std_logic;
     signal bl_char_op    : std_logic;
+    signal bl_copy_op    : std_logic;
+    signal bl_mask_op    : std_logic;
 
     signal rom_data      : std_logic_vector(7 downto 0);
     signal char_data     : std_logic_vector(7 downto 0);
@@ -176,6 +191,9 @@ begin
     -- Decode the blitter ops
     bl_fill_op <= '1' when bl_op = op_fill else '0';
     bl_char_op <= '1' when bl_op = op_char else '0';
+    bl_copy_op <= '1' when bl_fill_op = '0' and bl_char_op = '0' else '0';
+
+    bl_mask_op <= '1' when bl_copy_op = '1' and bl_param /= x"FF" else '0';
 
     process(clk_video)
     begin
@@ -194,21 +212,30 @@ begin
                         tmp_dst_addr    <= std_logic_vector(unsigned(bl_dst_addr) + unsigned(bl_dst_yinc_ext));
                         tmp_xcount      <= bl_xcount;
                         tmp_ycount      <= bl_ycount;
-                        if bl_fill_op = '1' then
-                            bl_state    <= wr_pending;
+                        if bl_copy_op = '1' then
+                            bl_state    <= rd1_pending;
                         else
-                            bl_state    <= rd_pending;
+                            bl_state    <= wr_pending;
                         end if;
                     end if;
 
-                when rd_pending =>
-                    if bl_rd_done = '1' then
-                        bl_state      <= wr_pending;
+                when rd1_pending =>
+                    if bl_rd1_done = '1' then
+                        if bl_mask_op = '1' then
+                            bl_state <= rd2_pending;
+                        else
+                            bl_state <= wr_pending;
+                        end if;
+                    end if;
+
+                when rd2_pending =>
+                    if bl_rd2_done = '1' then
+                        bl_state <= wr_pending;
                     end if;
 
                 when wr_pending =>
                     if bl_wr_done_lookahead = '1' then
-                        bl_state      <= inc;
+                        bl_state <= inc;
                     end if;
 
                 when inc =>
@@ -229,29 +256,31 @@ begin
                     -- Next state
                     if unsigned(tmp_xcount) = 0 and unsigned(tmp_ycount) = 0 then
                         bl_state <= idle;
-                    elsif bl_fill_op = '1' then
-                        bl_state <= wr_pending;
+                    elsif bl_copy_op = '1' then
+                        bl_state <= rd1_pending;
                     else
-                        bl_state <= rd_pending;
+                        bl_state <= wr_pending;
                     end if;
             end case;
         end if;
     end process;
 
 
-    process(bl_state, bl_rd_done, bl_wr_done)
+    process(bl_state, bl_rd1_done, bl_rd2_done, bl_wr_done)
     begin
         case bl_state is
             when idle =>
                 bl_debug(3 downto 0) <= x"0";
-            when rd_pending =>
+            when rd1_pending =>
                 bl_debug(3 downto 0) <= x"1";
-            when wr_pending =>
+            when rd2_pending =>
                 bl_debug(3 downto 0) <= x"2";
-            when inc =>
+            when wr_pending =>
                 bl_debug(3 downto 0) <= x"3";
+            when inc =>
+                bl_debug(3 downto 0) <= x"4";
         end case;
-        bl_debug(7 downto 4) <= "00" & bl_rd_done & bl_wr_done;
+        bl_debug(7 downto 4) <= '0' & bl_rd1_done & bl_rd2_done & bl_wr_done;
     end process;
 
     ------------------------------------------------
@@ -345,8 +374,9 @@ begin
             cpu_wr_pending1 <= cpu_wr_pending;
 
             -- bl_done defaults to '0'
-            bl_rd_done <= '0';
-            bl_wr_done <= '0';
+            bl_rd1_done <= '0';
+            bl_rd2_done <= '0';
+            bl_wr_done  <= '0';
 
             if clk_div = '0' and active = '1' then
                 -- Video Read Cycle
@@ -380,20 +410,28 @@ begin
                 elsif bl_char_op = '1' then
                     ram_din  <= char_data;
                 else
-                    ram_din  <= bl_data;
+                    ram_din  <= (bl_op1 and bl_param) or (bl_op2 and (bl_param xor x"FF"));
                 end if;
                 ram_cel     <= '0';
                 ram_oel     <= '1';
                 ram_wel_int <= '0';
                 bl_wr_done  <= '1';
-            elsif bl_state = rd_pending and bl_rd_done = '0' then
+            elsif bl_state = rd1_pending and bl_rd1_done = '0' then
                 -- Blitter Read Cycle
                 ram_addr    <= bl_ram_src_addr;
                 ram_din     <= (others => '0');
                 ram_cel     <= '0';
                 ram_oel     <= '0';
                 ram_wel_int <= '1';
-                bl_rd_done  <= '1';
+                bl_rd1_done <= '1';
+            elsif bl_state = rd2_pending and bl_rd2_done = '0' then
+                -- Blitter Read Cycle
+                ram_addr    <= bl_ram_dst_addr;
+                ram_din     <= (others => '0');
+                ram_cel     <= '0';
+                ram_oel     <= '0';
+                ram_wel_int <= '1';
+                bl_rd2_done <= '1';
             else
                 -- IDLE cycle
                 ram_addr     <= (others => '0');
@@ -404,8 +442,13 @@ begin
             end if;
 
             -- Handle the data from a blitter read cycle
-            if bl_rd_done = '1' then
-                bl_data <= ram_dout;
+            if bl_rd1_done = '1' then
+                bl_op1 <= ram_dout;
+            end if;
+
+            -- Handle the data from a blitter read cycle
+            if bl_rd2_done = '1' then
+                bl_op2 <= ram_dout;
             end if;
 
             -- Handle the data from a video read cycle
