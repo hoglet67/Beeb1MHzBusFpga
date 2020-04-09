@@ -1,7 +1,10 @@
-wrcvec      = &020E
+wrcvec         = &020E
 
+tmp            = &80
 blit_ptr       = &80
-blit_char_addr = &82
+cursor_x       = &82
+cursor_y       = &83
+
 
 blit_len       = 22
 
@@ -115,10 +118,8 @@ org &2800
 
 .vdu_1e
     LDA #0
-    STA blit_char_addr
-    STA blit_char_addr+1
-    STA blit_char_addr+2
-    STA blit_char_addr+3
+    STA cursor_x
+    STA cursor_y
     JMP oswrchexit
 
 .vdu_0d
@@ -134,19 +135,36 @@ org &2800
     STX &FCFF                   ; 6
     LDX #&FF                    ; 2
     STX &FCFE                   ; 6
-
 ;; Wait for Blitter to become free
 .loop
     LDX bl_status               ; 6
     BNE loop                    ; 2
+    STA bl_param                ; 6 = 30
 
-    STA bl_param                ; 6
-    LDA blit_char_addr          ; 3
+;; bl_dst_addr = 8192 * cursor_y + 8 * cursor_x
+    LDA cursor_x                ; 3
+    ASL A                       ; 2
+    ASL A                       ; 2
+    ASL A                       ; 2
     STA bl_dst_addr             ; 6
-    LDA blit_char_addr + 1      ; 3
+    LDA cursor_x                ; 3
+    AND #&60                    ; 2
+    STA tmp                     ; 3
+    LDA cursor_y                ; 3
+    AND #&07                    ; 2
+    ASL A                       ; 2
+    ORA tmp                     ; 3
+    ROL A                       ; 2
+    ROL A                       ; 2
+    ROL A                       ; 2
+    ROL A                       ; 2
     STA bl_dst_addr + 1         ; 6
-    LDA blit_char_addr + 2      ; 3
-    STA bl_dst_addr + 2         ; 6
+    LDA cursor_y                ; 3
+    LSR A                       ; 2
+    LSR A                       ; 2
+    LSR A                       ; 2
+    STA bl_dst_addr + 2         ; 6 = 62
+
     LDA #4                      ; 2
     LDX #0                      ; 2
     LDY #1                      ; 2
@@ -160,19 +178,16 @@ org &2800
     STA bl_ycount        ; &07  ; 6
     STX bl_ycount + 1    ; &00  ; 6
     STY bl_op            ; &01  ; 6
-    RTS                         ; 6
+    RTS                         ; 6 = 68
                                 ; ---
-                                ; 125
+                                ; 160
                                 ; ---
 }
 
 .cursor_left
 {
     ;; Are we in the left most column?
-    LDA blit_char_addr
-    BNE left
-    LDA blit_char_addr + 1
-    AND #&FC
+    LDA cursor_x
     BNE left
 
     JSR cursor_up
@@ -180,25 +195,15 @@ org &2800
 
 .left
     ;; Move the cursor 1 character to the left
-    SEC
-    LDA blit_char_addr
-    SBC #&08
-    STA blit_char_addr
-    LDA blit_char_addr + 1
-    SBC #&00
-    STA blit_char_addr + 1
+    DEC cursor_x
     RTS
 }
 
 .cursor_right
 {
     ;; Are we in the right most column?
-    LDA blit_char_addr
-    CMP #LO(640 - 8)
-    BNE right
-    LDA blit_char_addr + 1
-    AND #&FC
-    CMP #HI(640 - 8)
+    LDA cursor_x
+    CMP #79
     BNE right
 
     JSR cursor_down
@@ -206,24 +211,15 @@ org &2800
 
 .right
     ;; Move the cursor 1 character to the right
-    CLC
-    LDA blit_char_addr
-    ADC #&08
-    STA blit_char_addr
-    LDA blit_char_addr + 1
-    ADC #&00
-    STA blit_char_addr + 1
+    INC cursor_x
     RTS
 }
 
 .cursor_up
 {
     ;; Are we on the top line of the screen?
-    LDA blit_char_addr + 2
+    LDA cursor_y
     BNE up
-    LDA blit_char_addr + 1
-    CMP #LO(8*1024/256)
-    BCC up
 
 .scroll
     ;; Scroll the screen, leaving the cursor in the same place
@@ -235,26 +231,16 @@ org &2800
     JMP blit
 
 .up
-    SEC
-    LDA blit_char_addr + 1
-    SBC #HI(8*1024)
-    STA blit_char_addr + 1
-    LDA blit_char_addr + 2
-    SBC #&00
-    STA blit_char_addr + 2
+    DEC cursor_y
     RTS
 }
 
 .cursor_down
 {
     ;; Are we on the bottom line of the screen?
-    LDA blit_char_addr + 2
-    CMP #HI(472*1024/256)
-    BCC down
-    BNE scroll
-    LDA blit_char_addr + 1
-    CMP #LO(472*1024/256)
-    BCC down
+    LDA cursor_y
+    CMP #59
+    BNE down
 
 .scroll
     ;; Scroll the screen, leaving the cursor in the same place
@@ -266,35 +252,22 @@ org &2800
     JMP blit
 
 .down
-    CLC
-    LDA blit_char_addr + 1
-    ADC #HI(8*1024)
-    STA blit_char_addr + 1
-    LDA blit_char_addr + 2
-    ADC #&00
-    STA blit_char_addr + 2
+    INC cursor_y
     RTS
 }
 
 
 .cursor_sol
 {
-    LDA #&00
-    STA blit_char_addr
-    LDA blit_char_addr + 1
-    AND #&FC
-    STA blit_char_addr + 1
+    LDA #0
+    STA cursor_x
     RTS
 }
 
 .cursor_eol
 {
-    LDA #LO(640-8)
-    STA blit_char_addr
-    LDA blit_char_addr + 1
-    AND #&FC
-    ORA #HI(640-8)
-    STA blit_char_addr + 1
+    LDA #79
+    STA cursor_x
     RTS
 }
 
