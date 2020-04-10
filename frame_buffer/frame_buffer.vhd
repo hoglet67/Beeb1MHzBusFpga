@@ -658,8 +658,6 @@ begin
 
     bus_data <= selected & bl_selected & "000" & cpu_addr(18 downto 16) when   pgfc_n = '0' and bus_addr = x"FF" and rnw = '1' else
                              cpu_addr(15 downto  8) when                       pgfc_n = '0' and bus_addr = x"FE" and rnw = '1' else
-                             cpu_addr( 7 downto  0) when                       pgfc_n = '0' and bus_addr = x"FD" and rnw = '1' else
-                                        cpu_wr_data when                       pgfc_n = '0' and bus_addr = x"FC" and rnw = '1' else
                             bl_src_addr(7 downto 0) when bl_selected = '1' and pgfd_n = '0' and bus_addr = x"00" and rnw = '1' else
                            bl_src_addr(15 downto 8) when bl_selected = '1' and pgfd_n = '0' and bus_addr = x"01" and rnw = '1' else
                 "00000" & bl_src_addr(18 downto 16) when bl_selected = '1' and pgfd_n = '0' and bus_addr = x"02" and rnw = '1' else
@@ -691,11 +689,9 @@ begin
                                        cpu_rd_data  when    selected = '1' and pgfd_n = '0'                      and rnw = '1' else
                  (others => 'Z');
 
-    -- TODO: Fix this to allow sharing with other 1MHz devices
-    bus_data_oel <= not clke;
-
---    bus_data_oel <= '0' when selected = '1' and rnw = '1' and pgfd_n = '0' else
---                    '1';
+    bus_data_oel <= '0' when clke = '1' and pgfc_n = '0' and (bus_addr = x"FE" or bus_addr = x"FF") else
+                    '0' when clke = '1' and pgfd_n = '0' and selected = '1'                         else
+                    '1';
 
     ------------------------------------------------
     -- 1MHZ Bus FPGA Adapter Specific Stuff
