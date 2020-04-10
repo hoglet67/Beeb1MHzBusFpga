@@ -32,7 +32,6 @@ org &2800
 
 .opened
     STA fd
-    STA osgbpb_params
 
     ;; Read the header block
     JSR osgbpb_to_block
@@ -48,14 +47,6 @@ org &2800
 
 .type_rle
 
-    LDA #0
-    LDX block+&0D       ; Start Sector of Pixel - 1
-    INX
-    STA osargs_block+0
-    STX osargs_block+1
-    STA osargs_block+2
-    STA osargs_block+3
-
     ;; Copy the X and Y size
     ;; TODO: This should take account of other values in the header
     LDX #3
@@ -65,19 +56,27 @@ org &2800
     DEX
     BPL size_loop
 
+    ;; Resolution is half the size...
+    ;; The metadata says the size is 0x05FE x 0x047A which is 1534 x 1146.
+    ;; But the resolution is actually 768 x 574, as you stated eariler in this thread.
+    ;; It looks like the values stored in the header are in fact 2*(x_resolution - 1) and 2*(y_resolution - 1)
+    ;; so x/y resolution = (metadata/2) + 1
 
-    ;; Hack Size
-    LDA #LO(768)
-    STA xsize
-    LDA #HI(768)
-    STA xsize+1
-    LDA #LO(574)
-    STA ysize
-    LDA #HI(574)
-    STA ysize+1
+    LDX #2
+.half_loop
+    LSR xsize+1,X
+    ROR xsize,X
+    INC xsize,X
+    BNE xsize_no_wrap
+    INC xsize+1,X
+.xsize_no_wrap
+    DEX
+    DEX
+    BPL half_loop
 
-    ;; Skip a dummy block
-    JSR osgbpb_to_block
+    ;; Seek to the start of Palette Data
+    LDX #&02
+    JSR seek_to_sector
 
     LDA #&C7
     STA &FCFF
@@ -97,14 +96,10 @@ org &2800
     STA &FCFE
     JSR osgbpb_to_fd00
 
-    ;; Skip a dummy block
-    JSR osgbpb_to_block
-
     ;; Seek to the start of Pixel Data
-    ;LDA #&01
-    ;LDX #osargs_block
-    ;LDY fd
-    ;JSR OSARGS
+    LDX block+&0D       ; Start Sector of Pixel - 1
+    INX
+    JSR seek_to_sector
 
     ;; Initialize ix, iy and pp to 0
     LDA #0
@@ -120,6 +115,7 @@ org &2800
     LDX pp
     BNE rle_pair
 
+    ;; Read bext 256b of pixel data
     JSR osgbpb_to_block
 
     LDX #0
@@ -226,6 +222,17 @@ org &2800
     BNE pixel_loop
     JMP rle_loop
 
+.seek_to_sector
+    LDA #0
+    STA osargs_block+0
+    STX osargs_block+1
+    STA osargs_block+2
+    STA osargs_block+3
+    LDA #&01
+    LDX #osargs_block
+    LDY fd
+    JMP OSARGS
+
 .osgbpb_to_fd00
     LDA #&00
     STA osgbpb_params+1
@@ -239,6 +246,8 @@ org &2800
     LDA #HI(block)
     STA osgbpb_params+2
 .osgbpb_to
+    LDA fd
+    STA osgbpb_params
     LDA #&00
     STA osgbpb_params+5
     LDA #&01
