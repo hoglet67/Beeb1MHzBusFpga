@@ -91,11 +91,16 @@ architecture Behavioral of frame_buffer is
 
     signal selected        : std_logic;
     signal bl_selected     : std_logic;
+    signal palr_selected   : std_logic;
+    signal palg_selected   : std_logic;
+    signal palb_selected   : std_logic;
 
     signal clk_video       : std_logic;
     signal clk_video_n     : std_logic;
     signal clk_div         : std_logic;
 
+    signal pixel           : std_logic_vector(7 downto 0);
+    signal rgb             : std_logic_vector(11 downto 0);
     signal red             : std_logic_vector(3 downto 0);
     signal green           : std_logic_vector(3 downto 0);
     signal blue            : std_logic_vector(3 downto 0);
@@ -175,6 +180,22 @@ architecture Behavioral of frame_buffer is
     signal ram_doel      : std_logic_vector (7 downto 0);
     signal ram_din       : std_logic_vector (7 downto 0);
     signal ram_dout      : std_logic_vector (7 downto 0);
+
+    type palette_type is array (0 to 255) of std_logic_vector(3 downto 0);
+
+    function init_palette return palette_type is
+        variable i : integer;
+        variable tmp : palette_type;
+    begin
+        for i in 0 to 255 loop
+            tmp(i) := std_logic_vector(to_unsigned(i mod 16, 4));
+        end loop;
+        return tmp;
+    end function;
+
+    shared variable r_palette : palette_type := init_palette;
+    shared variable g_palette : palette_type := init_palette;
+    shared variable b_palette : palette_type := init_palette;
 
 begin
 
@@ -452,22 +473,8 @@ begin
             end if;
 
             -- Handle the data from a video read cycle
-            if clk_div = '1' then
-                if active = '1' then
-                    if outline = '1' then
-                        red   <= x"F";
-                        green <= x"F";
-                        blue  <= x"F";
-                    else
-                        red   <= ram_dout(2 downto 0) & '0';
-                        green <= ram_dout(5 downto 3) & '0';
-                        blue  <= ram_dout(7 downto 6) & ram_dout(6) & '0';
-                    end if;
-                else
-                    red   <= (others => '0');
-                    green <= (others => '0');
-                    blue  <= (others => '0');
-                end if;
+            if clk_div = '1' and active = '1' then
+                pixel <= ram_dout;
             end if;
 
             -- Handle the data from a CPU read cycle
@@ -522,21 +529,49 @@ begin
     end generate;
 
     ------------------------------------------------
+    -- Palette and Pixel Output
+    ------------------------------------------------
+
+    process(clk_video)
+    begin
+        if rising_edge(clk_video) then
+
+            if clk_div = '1' then
+                if active = '1' then
+                    if outline = '1' then
+                        red   <= x"F";
+                        green <= x"F";
+                        blue  <= x"F";
+                    else
+                        red   <= r_palette(to_integer(unsigned(pixel)));
+                        green <= g_palette(to_integer(unsigned(pixel)));
+                        blue  <= b_palette(to_integer(unsigned(pixel)));
+                    end if;
+                else
+                    red   <= (others => '0');
+                    green <= (others => '0');
+                    blue  <= (others => '0');
+                end if;
+            end if;
+        end if;
+    end process;
+
+    ------------------------------------------------
     -- 1MHz Bus Interface
     ------------------------------------------------
+
+    palr_selected <= '1' when selected = '1' and cpu_addr(18 downto 8) = "11111111100" else '0';
+    palg_selected <= '1' when selected = '1' and cpu_addr(18 downto 8) = "11111111101" else '0';
+    palb_selected <= '1' when selected = '1' and cpu_addr(18 downto 8) = "11111111110" else '0';
+    bl_selected   <= '1' when selected = '1' and cpu_addr(18 downto 8) = "11111111111" else '0';
 
     process(clke, rst_n)
     begin
         if rst_n = '0' then
             selected <= '0';
-            bl_selected <= '0';
         elsif falling_edge(clke) then
             bl_start <= '0';
-            if selected = '1' and cpu_addr(18 downto 8) = "11111111111" then
-                bl_selected <= '1';
-            else
-                bl_selected <= '0';
-            end if;
+
             if pgfc_n = '0' and bus_addr = x"FE" and rnw = '0' then
                 cpu_addr(15 downto 8) <= bus_data;
             end if;
@@ -547,6 +582,15 @@ begin
                 else
                     selected <= '0';
                 end if;
+            end if;
+            if palr_selected = '1' and pgfd_n = '0' and rnw = '0' then
+                r_palette(to_integer(unsigned(cpu_addr))) := bus_data(7 downto 4);
+            end if;
+            if palg_selected = '1' and pgfd_n = '0' and rnw = '0' then
+                g_palette(to_integer(unsigned(cpu_addr))) := bus_data(7 downto 4);
+            end if;
+            if palb_selected = '1' and pgfd_n = '0' and rnw = '0' then
+                b_palette(to_integer(unsigned(cpu_addr))) := bus_data(7 downto 4);
             end if;
             if bl_selected = '1' and pgfd_n = '0' and rnw = '0' then
                 case bus_addr is
