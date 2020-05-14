@@ -45,9 +45,6 @@ end life;
 
 architecture Behavioral of life is
 
-    constant H_BORDER      : integer := 16;
-    constant V_BORDER      : integer := 1;
-
     -- H_TOTAL = 2200
     constant H_ACTIVE      : integer := 1920;
     constant H_SYNC_START  : integer := H_ACTIVE + 88;
@@ -59,6 +56,12 @@ architecture Behavioral of life is
     constant V_SYNC_START  : integer := V_ACTIVE + 4;
     constant V_SYNC_END    : integer := V_SYNC_START + 5;
     constant V_TOTAL       : integer := V_SYNC_END + 36;
+
+    -- Write Offset (effectively the pipeline depth, in 8-pixel units
+    constant WR_OFFSET     : integer := (H_ACTIVE / 8) + 2;
+
+    -- Write Offset when wrapping
+    constant WR_WRAP       : integer := (H_ACTIVE * V_ACTIVE / 8) - WR_OFFSET;
 
     signal clk_pixel       : std_logic;
 
@@ -75,8 +78,8 @@ architecture Behavioral of life is
     signal active          : std_logic;
     signal outline         : std_logic;
 
-    signal ram_rd_addr     : std_logic_vector(18 downto 0);
-    signal ram_wr_addr     : std_logic_vector(18 downto 0);
+    signal ram_rd_addr     : unsigned(18 downto 0);
+    signal ram_wr_addr     : unsigned(18 downto 0);
     signal ram_dout        : std_logic_vector(7 downto 0);
     signal ram_din         : std_logic_vector(7 downto 0);
     signal ram_wel_int     : std_logic;
@@ -101,8 +104,8 @@ architecture Behavioral of life is
     signal n33_extended    : std_logic_vector(3 downto 0);
 
     signal neighbour_count : unsigned(3 downto 0);
-    signal row1            : std_logic_vector(H_ACTIVE - 2 * H_BORDER - 4 downto 0);
-    signal row2            : std_logic_vector(H_ACTIVE - 2 * H_BORDER - 4 downto 0);
+    signal row1            : std_logic_vector(H_ACTIVE - 4 downto 0);
+    signal row2            : std_logic_vector(H_ACTIVE - 4 downto 0);
     signal nextgen         : std_logic;
     signal nextgen1        : std_logic;
     signal nextgen2        : std_logic;
@@ -163,8 +166,7 @@ begin
             else
                 vsync <= '0';
             end if;
-            if h_counter >= H_BORDER and h_counter < H_ACTIVE - H_BORDER  and
-                v_counter >= V_BORDER and v_counter < V_ACTIVE - V_BORDER then
+            if h_counter < H_ACTIVE and v_counter < V_ACTIVE then
                 active <= '1';
             else
                 active <= '0';
@@ -256,26 +258,30 @@ begin
     end process;
 
     ------------------------------------------------
-    -- RAM Timings
+    -- RAM Address / Control Generation
     ------------------------------------------------
-
-    v_counter_offset <= v_counter - 1;
-
-    h_counter_offset <= h_counter(10 downto 3) - 2;
-
-    ram_wr_addr <= std_logic_vector(v_counter_offset & h_counter_offset);
-
-    ram_rd_addr <= std_logic_vector(v_counter(10 downto 0) & h_counter(10 downto 3));
 
     process(clk_pixel)
     begin
         if rising_edge(clk_pixel) then
+            if h_counter = 0 and v_counter = 0 then
+                ram_rd_addr <= (others => '0');
+            elsif active = '1' and h_counter(2 downto 0) = 7 then
+                ram_rd_addr <= ram_rd_addr + 1;
+            end if;
+
+            if ram_rd_addr < WR_OFFSET then
+                ram_wr_addr <= ram_rd_addr + WR_WRAP;
+            else
+                ram_wr_addr <= ram_rd_addr - WR_OFFSET;
+            end if;
+
             if active = '1' then
                 ram_cel <= '0';
                 ram_dout <= ram_dout(6 downto 0) & '0';
                 if h_counter(2) = '0' then
                     -- Read Cycle
-                    ram_addr <= ram_rd_addr;
+                    ram_addr <= std_logic_vector(ram_rd_addr);
                     ram_oel <= '0';
                     if h_counter(1 downto 0) = 3 then
                         ram_dout <= ram_data;
@@ -283,7 +289,7 @@ begin
                 else
                     -- Write Cycle
                     ram_oel <= '1';
-                    ram_addr <= ram_wr_addr;
+                    ram_addr <= std_logic_vector(ram_wr_addr);
                     if h_counter(1 downto 0) = 0 then
                         ram_din <= nextgen8;
                     end if;
