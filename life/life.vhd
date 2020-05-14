@@ -45,7 +45,8 @@ end life;
 
 architecture Behavioral of life is
 
-    constant BORDER        : integer := 1;
+    constant H_BORDER      : integer := 16;
+    constant V_BORDER      : integer := 1;
 
     -- H_TOTAL = 2200
     constant H_ACTIVE      : integer := 1920;
@@ -63,6 +64,8 @@ architecture Behavioral of life is
 
     signal h_counter       : unsigned(11 downto 0);
     signal v_counter       : unsigned(10 downto 0);
+    signal h_counter_offset: unsigned(7 downto 0);
+    signal v_counter_offset: unsigned(10 downto 0);
 
     signal red             : std_logic_vector(3 downto 0);
     signal green           : std_logic_vector(3 downto 0);
@@ -71,6 +74,41 @@ architecture Behavioral of life is
     signal vsync           : std_logic;
     signal active          : std_logic;
     signal outline         : std_logic;
+
+    signal ram_rd_addr     : std_logic_vector(18 downto 0);
+    signal ram_wr_addr     : std_logic_vector(18 downto 0);
+    signal ram_dout        : std_logic_vector(7 downto 0);
+    signal ram_din         : std_logic_vector(7 downto 0);
+    signal ram_wel_int     : std_logic;
+
+    signal n11             : std_logic;
+    signal n12             : std_logic;
+    signal n13             : std_logic;
+    signal n21             : std_logic;
+    signal n22             : std_logic;
+    signal n23             : std_logic;
+    signal n31             : std_logic;
+    signal n32             : std_logic;
+    signal n33             : std_logic;
+
+    signal n11_extended    : std_logic_vector(3 downto 0);
+    signal n12_extended    : std_logic_vector(3 downto 0);
+    signal n13_extended    : std_logic_vector(3 downto 0);
+    signal n21_extended    : std_logic_vector(3 downto 0);
+    signal n23_extended    : std_logic_vector(3 downto 0);
+    signal n31_extended    : std_logic_vector(3 downto 0);
+    signal n32_extended    : std_logic_vector(3 downto 0);
+    signal n33_extended    : std_logic_vector(3 downto 0);
+
+    signal neighbour_count : unsigned(3 downto 0);
+    signal row1            : std_logic_vector(H_ACTIVE - 2 * H_BORDER - 4 downto 0);
+    signal row2            : std_logic_vector(H_ACTIVE - 2 * H_BORDER - 4 downto 0);
+    signal nextgen         : std_logic;
+    signal nextgen1        : std_logic;
+    signal nextgen2        : std_logic;
+    signal nextgen3        : std_logic;
+    signal nextgen4        : std_logic;
+    signal nextgen8        : std_logic_vector(7 downto 0);
 
 begin
 
@@ -125,14 +163,14 @@ begin
             else
                 vsync <= '0';
             end if;
-            if h_counter >= 0 and h_counter < H_ACTIVE  and
-                v_counter >= 0 and v_counter < V_ACTIVE then
+            if h_counter >= H_BORDER and h_counter < H_ACTIVE - H_BORDER  and
+                v_counter >= V_BORDER and v_counter < V_ACTIVE - V_BORDER then
                 active <= '1';
             else
                 active <= '0';
             end if;
-            if h_counter < BORDER or h_counter >= H_ACTIVE - BORDER or
-                v_counter < BORDER or v_counter >= V_ACTIVE - BORDER then
+            if ((h_counter = 0 or h_counter = H_ACTIVE - 1) and v_counter < V_ACTIVE) or
+               ((v_counter = 0 or v_counter = V_ACTIVE - 1) and h_counter < H_ACTIVE) then
                 outline <= '1';
             else
                 outline <= '0';
@@ -147,23 +185,125 @@ begin
     process(clk_pixel)
     begin
         if rising_edge(clk_pixel) then
-            if active = '1' then
-                if outline = '1' then
-                    red   <= x"F";
-                    green <= x"F";
-                    blue  <= x"F";
-                else
-                    red   <= x"7";
-                    green <= x"7";
-                    blue  <= x"7";
-                end if;
+            if outline = '1' then
+                red   <= x"0";
+                green <= x"F";
+                blue  <= x"0";
+            elsif active = '1' and nextgen = '1' then
+                red   <= x"F";
+                green <= x"F";
+                blue  <= x"F";
             else
-                red   <= (others => '0');
-                green <= (others => '0');
-                blue  <= (others => '0');
+                red   <= x"0";
+                green <= x"0";
+                blue  <= x"0";
             end if;
         end if;
     end process;
+
+    ------------------------------------------------
+    -- Life
+    ------------------------------------------------
+
+    n11_extended <= "000" & n11;
+    n12_extended <= "000" & n12;
+    n13_extended <= "000" & n13;
+    n21_extended <= "000" & n21;
+    n23_extended <= "000" & n23;
+    n31_extended <= "000" & n31;
+    n32_extended <= "000" & n32;
+    n33_extended <= "000" & n33;
+
+    process(clk_pixel)
+    begin
+        if rising_edge(clk_pixel) then
+            if active = '1' then
+                n33 <= ram_dout(7);
+                n32 <= n33;
+                n31 <= n32;
+                row2 <= row2(row2'left - 1 downto 0) & n31;
+                n23 <= row2(row2'left);
+                n22 <= n23;
+                n21 <= n22;
+                row1 <= row1(row1'left - 1 downto 0) & n21;
+                n13 <= row1(row1'left);
+                n12 <= n13;
+                n11 <= n12;
+                neighbour_count <=
+                    unsigned(n11_extended) +
+                    unsigned(n12_extended) +
+                    unsigned(n13_extended) +
+                    unsigned(n21_extended) +
+                    unsigned(n23_extended) +
+                    unsigned(n31_extended) +
+                    unsigned(n32_extended) +
+                    unsigned(n33_extended);
+                -- Using n21 here as neighbour_count is pipelined
+                if neighbour_count = 3 or (n21 = '1' and neighbour_count = 2) then
+                    nextgen <= '1';
+                else
+                    nextgen <= '0';
+                end if;
+                -- Pad so pipeline a multiple of 8 pixels deel
+                nextgen1 <= nextgen;
+                nextgen2 <= nextgen1;
+                nextgen3 <= nextgen2;
+                nextgen4 <= nextgen3;
+                -- Accumulate 8 samples
+                nextgen8 <= nextgen8(nextgen8'left - 1 downto 0) & nextgen4;
+            end if;
+        end if;
+    end process;
+
+    ------------------------------------------------
+    -- RAM Timings
+    ------------------------------------------------
+
+    v_counter_offset <= v_counter - 1;
+
+    h_counter_offset <= h_counter(10 downto 3) - 2;
+
+    ram_wr_addr <= std_logic_vector(v_counter_offset & h_counter_offset);
+
+    ram_rd_addr <= std_logic_vector(v_counter(10 downto 0) & h_counter(10 downto 3));
+
+    process(clk_pixel)
+    begin
+        if rising_edge(clk_pixel) then
+            if active = '1' then
+                ram_cel <= '0';
+                ram_dout <= ram_dout(6 downto 0) & '0';
+                if h_counter(2) = '0' then
+                    -- Read Cycle
+                    ram_addr <= ram_rd_addr;
+                    ram_oel <= '0';
+                    if h_counter(1 downto 0) = 3 then
+                        ram_dout <= ram_data;
+                    end if;
+                else
+                    -- Write Cycle
+                    ram_oel <= '1';
+                    ram_addr <= ram_wr_addr;
+                    if h_counter(1 downto 0) = 0 then
+                        ram_din <= nextgen8;
+                    end if;
+                    if h_counter(1 downto 0) = 1 or h_counter(1 downto 0) = 2 then
+                        ram_wel_int <= '0';
+                    else
+                        ram_wel_int <= '1';
+                    end if;
+                end if;
+            else
+                ram_cel <= '1';
+                ram_oel <= '1';
+                ram_wel_int <= '1';
+                ram_addr <= (others => '1');
+            end if;
+        end if;
+    end process;
+
+    ram_wel  <= ram_wel_int;
+    ram_data <= ram_din when ram_wel_int = '0' else (others => 'Z');
 
     ------------------------------------------------
     -- 1MHZ Bus FPGA Adapter Specific Stuff
@@ -186,11 +326,5 @@ begin
     dac_sck      <= '1';
     dac_sdi      <= '1';
     dac_ldac_n   <= '1';
-
-    ram_addr     <= (others => '1');
-    ram_data     <= (others => 'Z');
-    ram_cel      <= '1';
-    ram_oel      <= '1';
-    ram_wel      <= '1';
 
 end Behavioral;
