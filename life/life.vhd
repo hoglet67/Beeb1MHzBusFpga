@@ -113,6 +113,18 @@ architecture Behavioral of life is
     signal nextgen4        : std_logic;
     signal nextgen8        : std_logic_vector(7 downto 0);
 
+    signal selected        : std_logic;
+    signal cpu_addr        : std_logic_vector(18 downto 0);
+    signal cpu_wr_data     : std_logic_vector(7 downto 0);
+    signal cpu_wr_pending  : std_logic;
+    signal cpu_wr_pending1 : std_logic;
+    signal cpu_wr_pending2 : std_logic;
+    signal cpu_rd_data     : std_logic_vector(7 downto 0);
+    signal cpu_rd_pending  : std_logic;
+    signal cpu_rd_pending1 : std_logic;
+    signal cpu_rd_pending2 : std_logic;
+    signal control         : std_logic_vector(7 downto 0) := x"80";
+
 begin
 
     ------------------------------------------------
@@ -191,7 +203,7 @@ begin
                 red   <= x"0";
                 green <= x"F";
                 blue  <= x"0";
-            elsif active = '1' and nextgen = '1' then
+            elsif active = '1' and n22 = '1' then
                 red   <= x"F";
                 green <= x"F";
                 blue  <= x"F";
@@ -264,6 +276,13 @@ begin
     process(clk_pixel)
     begin
         if rising_edge(clk_pixel) then
+
+            -- Synchronize the RD/WR Pending signals from the 1MHz Domain
+            if h_counter(1 downto 0) = 3 then
+                cpu_rd_pending1 <= cpu_rd_pending;
+                cpu_wr_pending1 <= cpu_wr_pending;
+            end if;
+
             if h_counter = 0 and v_counter = 0 then
                 ram_rd_addr <= (others => '0');
             elsif active = '1' and h_counter(2 downto 0) = 7 then
@@ -276,28 +295,44 @@ begin
                 ram_wr_addr <= ram_rd_addr - WR_OFFSET;
             end if;
 
-            if active = '1' then
+            ram_dout <= ram_dout(6 downto 0) & '0';
+
+            if active = '1' and h_counter(2) = '0' then
+                -- Life Engine Read Cycle
                 ram_cel <= '0';
-                ram_dout <= ram_dout(6 downto 0) & '0';
-                if h_counter(2) = '0' then
-                    -- Read Cycle
-                    ram_addr <= std_logic_vector(ram_rd_addr);
-                    ram_oel <= '0';
-                    if h_counter(1 downto 0) = 3 then
-                        ram_dout <= ram_data;
-                    end if;
+                ram_addr <= std_logic_vector(ram_rd_addr);
+                ram_oel <= '0';
+                if h_counter(1 downto 0) = 3 then
+                    ram_dout <= ram_data;
+                end if;
+            elsif active = '1' and h_counter(2) = '1' and control(7) = '1' then
+                -- Life Engine Write Cyle
+                ram_cel <= '0';
+                ram_oel <= '1';
+                ram_addr <= std_logic_vector(ram_wr_addr);
+                if h_counter(1 downto 0) = 0 then
+                    ram_din <= nextgen8;
+                end if;
+                if h_counter(1 downto 0) = 1 or h_counter(1 downto 0) = 2 then
+                    ram_wel_int <= '0';
                 else
-                    -- Write Cycle
-                    ram_oel <= '1';
-                    ram_addr <= std_logic_vector(ram_wr_addr);
-                    if h_counter(1 downto 0) = 0 then
-                        ram_din <= nextgen8;
-                    end if;
-                    if h_counter(1 downto 0) = 1 or h_counter(1 downto 0) = 2 then
-                        ram_wel_int <= '0';
-                    else
-                        ram_wel_int <= '1';
-                    end if;
+                    ram_wel_int <= '1';
+                end if;
+            elsif h_counter(2) = '1' and control(7) = '0' and cpu_wr_pending2 /= cpu_wr_pending1 then
+                -- Beeb Write Cyle
+                ram_cel <= '0';
+                ram_oel <= '1';
+                ram_addr <= cpu_addr;
+                if h_counter(1 downto 0) = 0 then
+                    ram_din <= cpu_wr_data;
+                end if;
+                if h_counter(1 downto 0) = 1 or h_counter(1 downto 0) = 2 then
+                    ram_wel_int <= '0';
+                else
+                    ram_wel_int <= '1';
+                end if;
+                if h_counter(1 downto 0) = 3 then
+                    cpu_wr_pending2 <= cpu_wr_pending1;
                 end if;
             else
                 ram_cel <= '1';
@@ -312,15 +347,62 @@ begin
     ram_data <= ram_din when ram_wel_int = '0' else (others => 'Z');
 
     ------------------------------------------------
+    -- 1MHz Bus Interface
+    ------------------------------------------------
+
+    process(clke, rst_n)
+    begin
+        if rst_n = '0' then
+            selected <= '0';
+        elsif falling_edge(clke) then
+            if pgfc_n = '0' and bus_addr = x"FE" and rnw = '0' then
+                cpu_addr(15 downto 8) <= bus_data;
+            end if;
+            if pgfc_n = '0' and bus_addr = x"A0" and rnw = '0' then
+                control <= bus_data;
+            end if;
+            if pgfc_n = '0' and bus_addr = x"FF" and rnw = '0' then
+                cpu_addr(18 downto 16) <= bus_data(2 downto 0);
+                if bus_data(7 downto 3) = "11001" then
+                    selected <= '1';
+                else
+                    selected <= '0';
+                end if;
+            end if;
+            if selected = '1' and pgfd_n = '0' and rnw = '0' then
+                cpu_wr_pending <= not cpu_wr_pending;
+                cpu_wr_data <= bus_data;
+            end if;
+        end if;
+    end process;
+
+    process(clke)
+    begin
+        if rising_edge(clke) then
+            if selected = '1' and pgfd_n = '0' then
+                cpu_addr(7 downto 0) <= bus_addr;
+            end if;
+        end if;
+    end process;
+
+    bus_data <= selected & "0000" & cpu_addr(18 downto 16) when pgfc_n = '0' and bus_addr = x"FF" and rnw = '1' else
+                                    cpu_addr(15 downto  8) when pgfc_n = '0' and bus_addr = x"FE" and rnw = '1' else
+                                                   control when pgfc_n = '0' and bus_addr = x"A0" and rnw = '1' else
+                                              cpu_rd_data  when pgfd_n = '0' and  selected = '1'  and rnw = '1' else
+                 (others => 'Z');
+
+    bus_data_oel <= '0' when clke = '1' and pgfc_n = '0' and (bus_addr = x"A0" or bus_addr = x"FE" or bus_addr = x"FF") else
+                    '0' when clke = '1' and pgfd_n = '0' and selected = '1' else
+                    '1';
+
+    bus_data_dir <= rnw;
+
+    ------------------------------------------------
     -- 1MHZ Bus FPGA Adapter Specific Stuff
     ------------------------------------------------
 
     irq          <= '0';
     nmi          <= '0';
-
-    bus_data_dir <= '1';
-    bus_data_oel <= '1';
-    bus_data     <= (others => 'Z');
 
     pmod0        <= blue & red;
     pmod1        <= '0' & '0' & vsync & hsync & green ;
