@@ -1,3 +1,7 @@
+//`define VGA_1920_1080
+
+`define VGA_1600_1200
+
 module life (
              // System oscillator
              clk50,
@@ -66,6 +70,8 @@ module life (
    input             sw2;
    output            led;
 
+`ifdef VGA_1920_1080
+
    // H_TOTAL = 2200
    localparam H_ACTIVE      = 1920;
    localparam H_SYNC_START  = H_ACTIVE + 88;
@@ -77,6 +83,32 @@ module life (
    localparam V_SYNC_START  = V_ACTIVE + 4;
    localparam V_SYNC_END    = V_SYNC_START + 5;
    localparam V_TOTAL       = V_SYNC_END + 36;
+
+   // DCM
+   localparam DCM_M         = 3;
+   localparam DCM_D         = 1;
+
+`endif //  `ifdef VGA_1920_1080
+
+`ifdef VGA_1600_1200
+
+   // H_TOTAL = 2160
+   localparam H_ACTIVE      = 1600;
+   localparam H_SYNC_START  = H_ACTIVE + 64;
+   localparam H_SYNC_END    = H_SYNC_START + 192;
+   localparam H_TOTAL       = H_SYNC_END + 304;
+
+   // V_TOTAL = 1250
+   localparam V_ACTIVE      = 1200;
+   localparam V_SYNC_START  = V_ACTIVE + 1;
+   localparam V_SYNC_END    = V_SYNC_START + 3;
+   localparam V_TOTAL       = V_SYNC_END + 46;
+
+   // DCM
+   localparam DCM_M         = 13;
+   localparam DCM_D         = 4;
+
+`endif //  `ifdef VGA_1600_1200
 
    // Row width, excluding neighbour cells
    localparam ROW_WIDTH     = H_ACTIVE - 3;
@@ -146,8 +178,8 @@ module life (
 
    DCM
      #(
-       .CLKFX_MULTIPLY   (3),
-       .CLKFX_DIVIDE     (1),
+       .CLKFX_MULTIPLY   (DCM_M),
+       .CLKFX_DIVIDE     (DCM_D),
        .CLKIN_PERIOD     (20.000),
        .CLK_FEEDBACK     ("NONE")
        )
