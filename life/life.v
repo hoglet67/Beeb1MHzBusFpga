@@ -1,6 +1,9 @@
 //`define VGA_1920_1080
 
-`define VGA_1600_1200
+//`define VGA_1600_1200
+
+
+`define VGA_800_600
 
 module life (
              // System oscillator
@@ -110,6 +113,26 @@ module life (
 
 `endif //  `ifdef VGA_1600_1200
 
+`ifdef VGA_800_600
+
+   // H_TOTAL = 1056
+   localparam H_ACTIVE      = 800;
+   localparam H_SYNC_START  = H_ACTIVE + 40;
+   localparam H_SYNC_END    = H_SYNC_START + 128;
+   localparam H_TOTAL       = H_SYNC_END + 88;
+
+   // V_TOTAL = 628
+   localparam V_ACTIVE      = 600;
+   localparam V_SYNC_START  = V_ACTIVE + 1;
+   localparam V_SYNC_END    = V_SYNC_START + 4;
+   localparam V_TOTAL       = V_SYNC_END + 23;
+
+   // DCM
+   localparam DCM_M         = 4;
+   localparam DCM_D         = 5;
+
+`endif //  `ifdef VGA_800_600
+
    // Row width, excluding neighbour cells
    localparam ROW_WIDTH     = H_ACTIVE - 3;
 
@@ -119,19 +142,29 @@ module life (
    // Write Offset when wrapping
    localparam WR_WRAP       = (H_ACTIVE * V_ACTIVE / 8) - WR_OFFSET;
 
+   // Video Pipeline Delay (inc SRAM) in pixel clocks
+   localparam VPD           = 3;
+
    wire              clk_pixel;
+   reg [11:0]        h_counter_next;
    reg [11:0]        h_counter;
    reg [7:0]         h_counter_offset;
+   reg [10:0]        v_counter_next;
    reg [10:0]        v_counter;
    reg [10:0]        v_counter_offset;
 
    reg [3:0]         red;
    reg [3:0]         green;
    reg [3:0]         blue;
+   reg               active;
    reg               hsync;
    reg               vsync;
-   reg               active;
-   reg               outline;
+   reg               blank;
+   reg               border;
+   reg [VPD-1:0]     hsync0;
+   reg [VPD-1:0]     vsync0;
+   reg [VPD-1:0]     blank0;
+   reg [VPD-1:0]     border0;
 
    reg [18:0]        ram_rd_addr;
    reg [18:0]        ram_wr_addr;
@@ -174,7 +207,9 @@ module life (
    // Clock Generation
    // =================================================
 
-   // 50MHz->150MHz, giving a frame rate of 60.606Hz
+   // 50MHz->150.0MHz giving a frame rate of 60.606Hz @ 1920x1080
+   // 50MHz->162.5MHz giving a frame rate of 60.185Hz @ 1600x1200
+   // 50MHz-> 40.0MHz giving a frame rate of 60.317Hz @  800x600
 
    DCM
      #(
@@ -199,24 +234,33 @@ module life (
    // Video Timing
    // =================================================
 
-   always @(posedge clk_pixel) begin
+   always @(h_counter or v_counter) begin
       if (h_counter == H_TOTAL - 1) begin
-         h_counter <= 0;
+         h_counter_next = 0;
          if (v_counter == V_TOTAL - 1)
-           v_counter <= 0;
+           v_counter_next = 0;
          else
-           v_counter <= v_counter + 1'b1;
+           v_counter_next = v_counter + 1'b1;
       end else begin
-         h_counter <= h_counter + 1'b1;
+			v_counter_next = v_counter;
+         h_counter_next = h_counter + 1'b1;
       end
+   end // always @ (h_counter or v_counter)
 
-      hsync <= (h_counter >= H_SYNC_START && h_counter < H_SYNC_END);
-      vsync <= (v_counter >= V_SYNC_START && v_counter < V_SYNC_END);
+   always @(posedge clk_pixel) begin
+      h_counter <= h_counter_next;
+      v_counter <= v_counter_next;
 
-      active <= (h_counter < H_ACTIVE && v_counter < V_ACTIVE);
+      // Active is aligned with h_counter/v_counter
+      active    <= (h_counter_next < H_ACTIVE && v_counter_next < V_ACTIVE);
 
-      outline <= ((h_counter == 0 || h_counter == (H_ACTIVE - 1)) && v_counter < V_ACTIVE) ||
-                 ((v_counter == 0 || v_counter == (V_ACTIVE - 1)) && h_counter < H_ACTIVE);
+      // Skew the video control outputs by VPD clocks to compensate for the video pipeline delay
+      // (the other way of doing this would be with pipeline registers)
+      { hsync,  hsync0} <= {hsync0, (h_counter >= H_SYNC_START && h_counter < H_SYNC_END)};
+      { vsync,  vsync0} <= {vsync0, (v_counter >= V_SYNC_START && v_counter < V_SYNC_END)};
+      { blank,  blank0} <= {blank0, (h_counter >= H_ACTIVE || v_counter >= V_ACTIVE)};
+      {border, border0} <= {border0, ((h_counter == 0 || h_counter == H_ACTIVE - 1) && (v_counter < V_ACTIVE)) ||
+                                     ((v_counter == 0 || v_counter == V_ACTIVE - 1) && (h_counter < H_ACTIVE))};
 
    end // always @ (posedge clk_pixel)
 
@@ -225,14 +269,14 @@ module life (
    // =================================================
 
    always @(posedge clk_pixel) begin
-      if (outline) begin
-         red   <= 4'h0;
-         green <= 4'hF;
-         blue  <= 4'h0;
-      end else if (active && n22) begin
+      if ((!blank) && ram_dout[7]) begin
          red   <= 4'hF;
          green <= 4'hF;
          blue  <= 4'hF;
+      end else if (border) begin
+         red   <= 4'h0;
+         green <= 4'hF;
+         blue  <= 4'h0;
       end else begin
          red   <= 4'h0;
          green <= 4'h0;
