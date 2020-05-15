@@ -252,3 +252,118 @@
 .mask
     EQUB &80, &40, &20, &10, &08, &04, &02, &01
 }
+
+
+.clear_screen
+{
+        LDA #BASE
+        STA &FCFF
+        LDX #0
+        LDY #0
+.loop1
+        STX &FCFE
+        LDA #0
+.loop2
+        STA &FD00,Y
+        INY
+        BNE loop2
+        INX
+        BNE loop1
+        LDA &FCFF
+        CLC
+        ADC #1
+        ORA #BASE
+        STA &FCFF
+        CMP #BASE + 1 + ((X_WIDTH * Y_WIDTH) DIV &80000)
+        BNE loop1
+        RTS
+}
+
+
+.random_pattern
+{
+
+        PHA                    ; stack the pattern density 1-3
+
+        ;; Seed by reading system VIA T1C (&FE44)
+
+        LDX #4
+.seed_loop
+        TXA
+        PHA
+        LDA #&96
+        LDX #&44
+        JSR OSBYTE
+        TYA
+        PLA
+        TAX
+        STA seed, X
+        DEX
+        BPL seed_loop
+        PLA                     ; restore the pattern density
+        TAX
+        LDA #BASE
+        STA &FCFF
+        LDA #0
+        STA &FCFE
+        LDY #0
+.write_loop
+        LDA #&FF
+        STA temp
+        JSR random
+        AND temp
+        STA temp
+        JSR random
+        AND temp
+        STA temp
+        CPX #3
+        BCS random_next
+        JSR random
+        AND temp
+        STA temp
+        CPX #2
+        BCS random_next
+        JSR random
+        AND temp
+        STA temp
+.random_next
+        LDA temp
+        STA &FD00,Y
+        INY
+        BNE write_loop
+        INC &FCFE
+        BNE write_loop
+        LDA &FCFF
+        CLC
+        ADC #1
+        ORA #BASE
+        STA &FCFF
+        CMP #BASE + 1 + ((X_WIDTH * Y_WIDTH) DIV &80000)
+        BNE write_loop
+        RTS
+}
+
+.random
+{
+        TXA
+        PHA
+        LDX #8
+.loop
+        LDA seed + 2
+        LSR A
+        LSR A
+        LSR A
+        EOR seed + 4
+        ROR A
+        ROL seed
+        ROL seed + 1
+        ROL seed + 2
+        ROL seed + 3
+        ROL seed + 4
+        DEX
+        BNE loop
+        PLA
+        TAX
+        LDA seed
+        RTS
+}

@@ -15,6 +15,11 @@ OSWORD          = &FFF1
 OSBYTE          = &FFF4
 
 
+PATTERN_BASE    = 'A'
+
+TYPE_RLE        = 2
+TYPE_RANDOM     = 3
+
 pat_width       = &70
 pat_depth       = &72
 count           = &74
@@ -28,6 +33,10 @@ yy              = &7C
 multiplicand    = &80
 multiplier      = &83
 accumulator     = &84
+tmp             = &87
+
+src             = &88
+dst             = &8A
 
 
 MACRO M_INCREMENT zp

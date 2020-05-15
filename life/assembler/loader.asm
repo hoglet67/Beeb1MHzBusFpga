@@ -4,8 +4,32 @@ include "constants.asm"
 
 .start
 
-        ; Save the file handle of the RLE file
-        STY handle
+        JSR print_string
+
+        EQUB 22, 4
+        EQUS "Conway Life for the BBC Micro", 10, 10, 13
+        EQUS "Using the FPGA Engine", 10, 10, 13
+        NOP
+
+        JSR list_patterns
+        PHA
+
+        JSR print_string
+        EQUB 10, 13
+        EQUS "Press key A-"
+        NOP
+
+        PLA
+        JSR OSWRCH
+
+        JSR print_string
+        EQUS " for initial pattern:"
+        NOP
+
+        JSR OSRDCH
+        JSR OSWRCH
+
+        PHA
 
         ; Stop the Life Engine
         LDA &FCA0
@@ -15,12 +39,11 @@ include "constants.asm"
         BIT &FCA0
         BMI wait1
 
-        ; Clear the Screen
-        JSR clear
 
-        JSR rle_reader
+        JSR clear_screen
 
-        JSR OSRDCH
+        PLA                     ; create initial pattern
+        JSR draw_pattern
 
         ; Start the Life Engine
         LDA &FCA0
@@ -30,38 +53,17 @@ include "constants.asm"
         BIT &FCA0
         BPL wait2
 
-        RTS
 
+        JMP start
+
+
+include "patterns.asm"
 
 include "rle_reader_fpga.asm"
 
 include "rle_utils.asm"
 
-
-.clear
-{
-        LDA #BASE
-        STA &FCFF
-        LDX #0
-        LDY #0
-.loop1
-        STX &FCFE
-        LDA #0
-.loop2
-        STA &FD00,Y
-        INY
-        BNE loop2
-        INX
-        BNE loop1
-        LDA &FCFF
-        CLC
-        ADC #1
-        ORA #BASE
-        STA &FCFF
-        CMP #BASE + 1 + ((X_WIDTH * Y_WIDTH) DIV &80000)
-        BNE loop1
-        RTS
-}
+include "utils.asm"
 
 .end
 

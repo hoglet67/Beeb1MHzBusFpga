@@ -30,7 +30,6 @@
 
 .parse_rle_header
 {
-        JSR rle_next_byte
         JSR skip_whitespace
 .skip_comments
         LDA byte
