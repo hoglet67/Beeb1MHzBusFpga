@@ -144,42 +144,42 @@ module life (
    // Video Pipeline Delay (inc SRAM) in pixel clocks
    localparam VPD           = 3;
 
-   wire              clk_pixel;
-   reg [11:0]        h_counter_next;
-   reg [11:0]        h_counter;
-   reg [10:0]        v_counter_next;
-   reg [10:0]        v_counter;
+   wire                clk_pixel;
+   reg [11:0]          h_counter_next;
+   reg [11:0]          h_counter;
+   reg [10:0]          v_counter_next;
+   reg [10:0]          v_counter;
 
-   reg [3:0]         red;
-   reg [3:0]         green;
-   reg [3:0]         blue;
-   reg [4:0]         active;
-   reg               hsync;
-   reg               vsync;
-   reg               blank;
-   reg               border;
-   reg [VPD-1:0]     hsync0;
-   reg [VPD-1:0]     vsync0;
-   reg [VPD-1:0]     blank0;
-   reg [VPD-1:0]     border0;
-   reg [7:0]         mask;
+   reg [3:0]           red;
+   reg [3:0]           green;
+   reg [3:0]           blue;
+   reg [4:0]           active;
+   reg                 hsync;
+   reg                 vsync;
+   reg                 blank;
+   reg                 border;
+   reg [VPD-1:0]       hsync0;
+   reg [VPD-1:0]       vsync0;
+   reg [VPD-1:0]       blank0;
+   reg [VPD-1:0]       border0;
+   reg [7:0]           mask;
 
-   reg [18:0]        ram_rd_addr;
-   reg [18:0]        ram_wr_addr;
-   reg [7:0]         ram_dout;
-   reg [7:0]         ram_din;
+   reg [18:0]          ram_rd_addr;
+   reg [18:0]          ram_wr_addr;
+   reg [7:0]           ram_dout;
+   reg [7:0]           ram_din;
 
-   reg               n11;
-   reg               n12;
-   reg               n13;
-   reg               n21;
-   reg               n22;
-   reg               n23;
-   reg               n31;
-   reg               n32;
-   reg               n33;
+   reg                 n11;
+   reg                 n12;
+   reg                 n13;
+   reg                 n21;
+   reg                 n22;
+   reg                 n23;
+   reg                 n31;
+   reg                 n32;
+   reg                 n33;
 
-   reg [3:0]         neighbour_count;
+   reg [3:0]           neighbour_count;
    reg [ROW_WIDTH-1:0] row1;
    reg [ROW_WIDTH-1:0] row2;
    reg                 nextgen;
@@ -203,7 +203,6 @@ module life (
 
    wire                ctrl_running     = control[7];
    wire                ctrl_mask_writes = control[6];
-
 
    // =================================================
    // Clock Generation
@@ -352,12 +351,12 @@ module life (
            ram_dout <= ram_data;
 
          // Compute the mask for the next write cycle (to prevent wrapping)
-         //  (v_counter is 1 line  ahead of the write address)
+         //  (v_counter is 1 line ahead of the write address)
          //  (h_counter is 2 bytes ahead of the write address)
-         if (ctrl_mask_writes && v_counter == 3)
+         if (ctrl_mask_writes && v_counter == 1)
            // Top
            mask <= 8'h00;
-         if (ctrl_mask_writes && v_counter == 0)
+         else if (ctrl_mask_writes && v_counter == 0)
            // Bottom
            mask <= 8'h00;
          else if (ctrl_mask_writes && h_counter[11:3] == 2)
