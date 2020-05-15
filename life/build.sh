@@ -1,5 +1,16 @@
 #!/bin/bash
 
+BUILD=$(date +"%Y%m%d_%H%M")
+
+NAME=beeb_fpga_life_$BUILD
+
+DIR=releases/$NAME
+
+echo "Release name: $NAME"
+
+rm -rf $DIR
+mkdir -p $DIR
+
 build=build
 
 rm -rf ${build}
@@ -61,9 +72,8 @@ do
 done
 cd ..
 
-
 # Create the !boot file
-echo -e -n "*RUN BLIFE\r" > ${build}/\!BOOT
+echo -e -n "*RUN LOADER\r" > ${build}/\!BOOT
 
 # Add into the SSD
 beeb putfile ${build}/${ssd} ${build}/\!BOOT
@@ -76,3 +86,12 @@ beeb opt4 ${build}/${ssd} 3
 
 # List the disk
 beeb info ${build}/${ssd}
+
+# Zip Everything Up
+cp ${build}/${ssd} $DIR
+cp ${build}/loader.log $DIR
+cp working/life.bit $DIR
+zip -qr $DIR.zip $DIR
+
+echo
+unzip -l $DIR.zip
