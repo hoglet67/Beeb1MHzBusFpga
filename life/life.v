@@ -91,7 +91,7 @@ module life (
    localparam DCM_M         = 3;
    localparam DCM_D         = 1;
 
-`endif //  `ifdef VGA_1920_1080
+`endif
 
 `ifdef VGA_1600_1200
 
@@ -111,7 +111,7 @@ module life (
    localparam DCM_M         = 13;
    localparam DCM_D         = 4;
 
-`endif //  `ifdef VGA_1600_1200
+`endif
 
 `ifdef VGA_800_600
 
@@ -131,7 +131,7 @@ module life (
    localparam DCM_M         = 4;
    localparam DCM_D         = 5;
 
-`endif //  `ifdef VGA_800_600
+`endif
 
    // Row width, excluding neighbour cells
    localparam ROW_WIDTH     = H_ACTIVE - 3;
@@ -148,15 +148,13 @@ module life (
    wire              clk_pixel;
    reg [11:0]        h_counter_next;
    reg [11:0]        h_counter;
-   reg [7:0]         h_counter_offset;
    reg [10:0]        v_counter_next;
    reg [10:0]        v_counter;
-   reg [10:0]        v_counter_offset;
 
    reg [3:0]         red;
    reg [3:0]         green;
    reg [3:0]         blue;
-   reg               active;
+   reg [4:0]         active;
    reg               hsync;
    reg               vsync;
    reg               blank;
@@ -165,6 +163,7 @@ module life (
    reg [VPD-1:0]     vsync0;
    reg [VPD-1:0]     blank0;
    reg [VPD-1:0]     border0;
+   reg [7:0]         mask;
 
    reg [18:0]        ram_rd_addr;
    reg [18:0]        ram_wr_addr;
@@ -245,14 +244,15 @@ module life (
 			v_counter_next = v_counter;
          h_counter_next = h_counter + 1'b1;
       end
-   end // always @ (h_counter or v_counter)
+   end
 
    always @(posedge clk_pixel) begin
       h_counter <= h_counter_next;
       v_counter <= v_counter_next;
 
-      // Active is aligned with h_counter/v_counter
-      active    <= (h_counter_next < H_ACTIVE && v_counter_next < V_ACTIVE);
+      // Active[0] is aligned with h_counter/v_counter
+      // Active[4] is used by the life engine
+      active    <= {active[3:0], (h_counter_next < H_ACTIVE && v_counter_next < V_ACTIVE)};
 
       // Skew the video control outputs by VPD clocks to compensate for the video pipeline delay
       // (the other way of doing this would be with pipeline registers)
@@ -261,8 +261,7 @@ module life (
       { blank,  blank0} <= {blank0, (h_counter >= H_ACTIVE || v_counter >= V_ACTIVE)};
       {border, border0} <= {border0, ((h_counter == 0 || h_counter == H_ACTIVE - 1) && (v_counter < V_ACTIVE)) ||
                                      ((v_counter == 0 || v_counter == V_ACTIVE - 1) && (h_counter < H_ACTIVE))};
-
-   end // always @ (posedge clk_pixel)
+   end
 
    // =================================================
    // Pixel Output
@@ -282,14 +281,14 @@ module life (
          green <= 4'h0;
          blue  <= 4'h0;
       end
-   end // always @ (posedge clk_pixel)
+   end
 
    // =================================================
    // Life
    // =================================================
 
    always @(posedge clk_pixel) begin
-      if (active) begin
+      if (active[4]) begin
          n33 <= ram_dout[7];
          n32 <= n33;
          n31 <= n32;
@@ -307,15 +306,15 @@ module life (
          // Using n21 here as neighbour_count is pipelined
          nextgen <= (neighbour_count == 3) || (n21 && (neighbour_count == 2));
 
-         // Pad so pipeline a multiple of 8 pixels deel
+         // Add registers to make pipeline a multiple of 8 pixels deep
          nextgen1 <= nextgen;
          nextgen2 <= nextgen1;
          nextgen3 <= nextgen2;
          nextgen4 <= nextgen3;
          // Accumulate 8 samples
          nextgen8 <= {nextgen8[6:0], nextgen4};
-      end // if (active)
-   end // always @ (posedge clk_pixel)
+      end
+   end
 
    // =================================================
    // RAM Address / Control Generation
@@ -331,7 +330,7 @@ module life (
 
       if (h_counter == 0 && v_counter == 0)
         ram_rd_addr <= 0;
-      else if (active && h_counter[2:0] == 7)
+      else if (active[0] && h_counter[2:0] == 7)
         ram_rd_addr <= ram_rd_addr + 1'b1;
 
       if (ram_rd_addr < WR_OFFSET)
@@ -341,20 +340,40 @@ module life (
 
       ram_dout <= {ram_dout[6:0], 1'b0};
 
-      if (active && !h_counter[2]) begin
+      if (active[0] && !h_counter[2]) begin
          // Life Engine Read Cycle
          ram_cel <= 1'b0;
          ram_addr <= ram_rd_addr;
          ram_oel <= 1'b0;
          if (h_counter[1:0] == 3)
            ram_dout <= ram_data;
-      end else if (active && h_counter[2] && control[7]) begin
+
+         // Compute the mask for the next write cycle (to prevent wrapping)
+         //  (v_counter is 1 line  ahead of the write address)
+         //  (h_counter is 2 bytes ahead of the write address)
+         if (v_counter == 3)
+           // Top
+           mask <= 8'h00;
+         if (v_counter == 0)
+           // Bottom
+           mask <= 8'h00;
+         else if (h_counter[11:3] == 2)
+           // Left
+           mask <= 8'h7f;
+         else if (h_counter[11:3] == 1)
+           // Right
+           mask <= 8'hfe;
+         else
+           // No masking
+           mask <= 8'hff;
+
+      end else if (active[0] && h_counter[2] && control[7]) begin
          // Life Engine Write Cyle
          ram_cel <= 1'b0;
          ram_oel <= 1'b1;
          ram_addr <= ram_wr_addr;
          if (h_counter[1:0] == 0)
-           ram_din <= nextgen8;
+           ram_din <= nextgen8 & mask;
          if (h_counter[1:0] == 1 || h_counter[1:0] == 2)
            ram_wel <= 1'b0;
          else
@@ -377,8 +396,8 @@ module life (
          ram_oel <= 1'b1;
          ram_wel <= 1'b1;
          ram_addr <= 19'h7FFFF;
-      end // else: !if(h_counter(2) && !control(7) && cpu_wr_pending2 != cpu_wr_pending1)
-   end // always @ (posedge clk_pixel)
+      end
+   end
 
    assign ram_data = ram_wel ? 8'hZZ : ram_din;
 
@@ -405,8 +424,8 @@ module life (
             cpu_wr_pending <= !cpu_wr_pending;
             cpu_wr_data <= bus_data;
          end
-      end // else: !if(!rst_n)
-   end // always @ (negedge clke or negedge rst_n)
+      end
+   end
 
    always @(posedge clke)
      if (selected && !pgfd_n)
