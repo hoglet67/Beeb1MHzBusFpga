@@ -138,12 +138,14 @@ module life (
    // Write Offset (effectively the pipeline depth, in 8-pixel units
    localparam WR_OFFSET     = (H_ACTIVE / 8) + 2;
 
+
    // Write Offset when wrapping
    localparam WR_WRAP       = (H_ACTIVE * V_ACTIVE / 8) - WR_OFFSET;
 
    // Video Pipeline Delay (inc SRAM) in pixel clocks
    localparam VPD           = 3;
 
+   wire                clk0;
    wire                clk_pixel;
    reg [11:0]          h_counter_next;
    reg [11:0]          h_counter;
@@ -166,6 +168,8 @@ module life (
 
    reg [18:0]          ram_rd_addr;
    reg [18:0]          ram_wr_addr;
+   wire [18:0]         ram_wr_offset = WR_OFFSET;
+   wire [18:0]         ram_wr_wrap = WR_WRAP;
    reg [7:0]           ram_dout;
    reg [7:0]           ram_din;
 
@@ -217,18 +221,29 @@ module life (
        .CLKFX_MULTIPLY   (DCM_M),
        .CLKFX_DIVIDE     (DCM_D),
        .CLKIN_PERIOD     (20.000),
-       .CLK_FEEDBACK     ("NONE")
+       .CLK_FEEDBACK     ("1X")
        )
    DCM1
      (
       .CLKIN            (clk50),
-      .CLKFB            (1'b0),
+      .CLKFB            (clk0),
       .RST              (1'b0),
       .DSSEN            (1'b0),
       .PSINCDEC         (1'b0),
       .PSEN             (1'b0),
       .PSCLK            (1'b0),
-      .CLKFX            (clk_pixel)
+      .CLKFX            (clk_pixel),
+      .CLKFX180         (),
+      .CLKDV            (),
+      .CLK2X            (),
+      .CLK2X180         (),
+      .CLK0             (clk0),
+      .CLK90            (),
+      .CLK180           (),
+      .CLK270           (),
+      .LOCKED           (),
+      .PSDONE           (),
+      .STATUS           () 
       );
 
    // =================================================
@@ -336,9 +351,9 @@ module life (
         ram_rd_addr <= ram_rd_addr + 1'b1;
 
       if (ram_rd_addr < WR_OFFSET)
-        ram_wr_addr <= ram_rd_addr + WR_WRAP;
+        ram_wr_addr <= ram_rd_addr + ram_wr_wrap;
       else
-        ram_wr_addr <= ram_rd_addr - WR_OFFSET;
+        ram_wr_addr <= ram_rd_addr - ram_wr_offset;
 
       ram_dout <= {ram_dout[6:0], 1'b0};
 
@@ -380,6 +395,15 @@ module life (
            ram_wel <= 1'b0;
          else
            ram_wel <= 1'b1;
+      end else if (!h_counter[2] && !ctrl_running && cpu_rd_pending2 != cpu_rd_pending1) begin
+         // Beeb Read Cyle
+         ram_cel <= 1'b0;
+         ram_addr <= cpu_addr;
+         ram_oel <= 1'b0;
+         if (h_counter[1:0] == 3) begin
+           cpu_rd_data <= ram_data;
+           cpu_rd_pending2 <= cpu_rd_pending1;
+         end
       end else if (h_counter[2] && !ctrl_running && cpu_wr_pending2 != cpu_wr_pending1) begin
          // Beeb Write Cyle
          ram_cel <= 1'b0;
@@ -429,10 +453,12 @@ module life (
       end
    end
 
-   always @(posedge clke)
-     if (selected && !pgfd_n)
-       cpu_addr[7:0] <= bus_addr;
-
+   always @(posedge clke) begin
+      if (selected && !pgfd_n)
+        cpu_addr[7:0] <= bus_addr;
+      if (selected && !pgfd_n && rnw)
+        cpu_rd_pending <= !cpu_rd_pending;
+   end
 
    assign bus_data = (!pgfc_n && bus_addr == 8'hFF && rnw) ? {selected, 4'b0000, cpu_addr[18:16]} :
                      (!pgfc_n && bus_addr == 8'hFE && rnw) ? cpu_addr[15:8]                       :
