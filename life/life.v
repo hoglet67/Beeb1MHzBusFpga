@@ -2,7 +2,6 @@
 
 //`define VGA_1600_1200
 
-
 `define VGA_800_600
 
 module life (
@@ -202,6 +201,10 @@ module life (
    reg                 cpu_rd_pending2;
    reg [7:0]           control = 8'h80;
 
+   wire                ctrl_running     = control[7];
+   wire                ctrl_mask_writes = control[6];
+
+
    // =================================================
    // Clock Generation
    // =================================================
@@ -351,23 +354,23 @@ module life (
          // Compute the mask for the next write cycle (to prevent wrapping)
          //  (v_counter is 1 line  ahead of the write address)
          //  (h_counter is 2 bytes ahead of the write address)
-         if (v_counter == 3)
+         if (ctrl_mask_writes && v_counter == 3)
            // Top
            mask <= 8'h00;
-         if (v_counter == 0)
+         if (ctrl_mask_writes && v_counter == 0)
            // Bottom
            mask <= 8'h00;
-         else if (h_counter[11:3] == 2)
+         else if (ctrl_mask_writes && h_counter[11:3] == 2)
            // Left
            mask <= 8'h7f;
-         else if (h_counter[11:3] == 1)
+         else if (ctrl_mask_writes && h_counter[11:3] == 1)
            // Right
            mask <= 8'hfe;
          else
            // No masking
            mask <= 8'hff;
 
-      end else if (active[0] && h_counter[2] && control[7]) begin
+      end else if (active[0] && h_counter[2] && ctrl_running) begin
          // Life Engine Write Cyle
          ram_cel <= 1'b0;
          ram_oel <= 1'b1;
@@ -378,7 +381,7 @@ module life (
            ram_wel <= 1'b0;
          else
            ram_wel <= 1'b1;
-      end else if (h_counter[2] && !control[7] && cpu_wr_pending2 != cpu_wr_pending1) begin
+      end else if (h_counter[2] && !ctrl_running && cpu_wr_pending2 != cpu_wr_pending1) begin
          // Beeb Write Cyle
          ram_cel <= 1'b0;
          ram_oel <= 1'b1;
