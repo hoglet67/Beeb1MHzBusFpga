@@ -1,8 +1,8 @@
 //`define VGA_1920_1080
 
-//`define VGA_1600_1200
+`define VGA_1600_1200
 
-`define VGA_800_600
+//`define VGA_800_600
 
 module life (
              // System oscillator
@@ -183,6 +183,8 @@ module life (
    reg                 n32;
    reg                 n33;
 
+   reg                 running;
+
    reg [3:0]           neighbour_count;
    reg [ROW_WIDTH-1:0] row1;
    reg [ROW_WIDTH-1:0] row2;
@@ -243,7 +245,7 @@ module life (
       .CLK270           (),
       .LOCKED           (),
       .PSDONE           (),
-      .STATUS           () 
+      .STATUS           ()
       );
 
    // =================================================
@@ -345,10 +347,12 @@ module life (
          cpu_wr_pending1 <= cpu_wr_pending;
       end
 
-      if (h_counter == 0 && v_counter == 0)
-        ram_rd_addr <= 0;
-      else if (active[0] && h_counter[2:0] == 7)
-        ram_rd_addr <= ram_rd_addr + 1'b1;
+      if (h_counter == 0 && v_counter == 0) begin
+         ram_rd_addr <= 0;
+         running <= ctrl_running;
+      end else if (active[0] && h_counter[2:0] == 7) begin
+         ram_rd_addr <= ram_rd_addr + 1'b1;
+      end
 
       if (ram_rd_addr < WR_OFFSET)
         ram_wr_addr <= ram_rd_addr + ram_wr_wrap;
@@ -384,7 +388,7 @@ module life (
            // No masking
            mask <= 8'hff;
 
-      end else if (active[0] && h_counter[2] && ctrl_running) begin
+      end else if (active[0] && h_counter[2] && running) begin
          // Life Engine Write Cyle
          ram_cel <= 1'b0;
          ram_oel <= 1'b1;
@@ -395,7 +399,7 @@ module life (
            ram_wel <= 1'b0;
          else
            ram_wel <= 1'b1;
-      end else if (!h_counter[2] && !ctrl_running && cpu_rd_pending2 != cpu_rd_pending1) begin
+      end else if (h_counter[2] && !running && cpu_rd_pending2 != cpu_rd_pending1) begin
          // Beeb Read Cyle
          ram_cel <= 1'b0;
          ram_addr <= cpu_addr;
@@ -404,7 +408,7 @@ module life (
            cpu_rd_data <= ram_data;
            cpu_rd_pending2 <= cpu_rd_pending1;
          end
-      end else if (h_counter[2] && !ctrl_running && cpu_wr_pending2 != cpu_wr_pending1) begin
+      end else if (h_counter[2] && !running && cpu_wr_pending2 != cpu_wr_pending1) begin
          // Beeb Write Cyle
          ram_cel <= 1'b0;
          ram_oel <= 1'b1;
@@ -462,7 +466,7 @@ module life (
 
    assign bus_data = (!pgfc_n && bus_addr == 8'hFF && rnw) ? {selected, 4'b0000, cpu_addr[18:16]} :
                      (!pgfc_n && bus_addr == 8'hFE && rnw) ? cpu_addr[15:8]                       :
-                     (!pgfc_n && bus_addr == 8'hA0 && rnw) ? control                              :
+                     (!pgfc_n && bus_addr == 8'hA0 && rnw) ? {running, control[6:0]}              :
                      (!pgfd_n && selected          && rnw) ? cpu_rd_data                          :
                      8'hZZ;
 
