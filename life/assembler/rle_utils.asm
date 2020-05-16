@@ -82,6 +82,7 @@
         BEQ save_done
         CPX #NAME_WIDTH
         BNE save_loop
+        JSR skip_line
 .save_done
         LDA #13
         STA rle_name, X
