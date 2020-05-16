@@ -23,6 +23,8 @@ PATTERN_BASE    = 'A'
 TYPE_RLE        = 2
 TYPE_RANDOM     = 3
 
+NAME_WIDTH      = 20
+
 pat_width       = &70
 pat_depth       = &72
 count           = &74
@@ -44,6 +46,9 @@ src             = &88
 dst             = &8A
 tmp             = &8C
 piv             = &8E
+
+pad             = byte
+num             = temp
 
 MACRO M_INCREMENT zp
         INC zp

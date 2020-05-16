@@ -80,7 +80,7 @@
         BEQ save_done
         CMP #13
         BEQ save_done
-        CPX #&1F
+        CPX #NAME_WIDTH
         BNE save_loop
 .save_done
         LDA #13
@@ -89,7 +89,7 @@
 }
 
 .rle_name
-        SKIP 32
+        SKIP NAME_WIDTH + 1
 
 .parse_size
 {

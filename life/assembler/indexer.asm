@@ -89,13 +89,35 @@
         JSR close_pattern     ; close the RLE file
 
 
-        LDX #&FF
+        LDX #&00
 .loop
-        INX
         LDA rle_name, X
-        JSR OSASCI
         CMP #&0D
+        BEQ done
+        JSR OSWRCH
+        INX
         BNE loop
+.done
+
+        LDA #30
+        JSR tab_to_col
+        LDA pat_width
+        STA num
+        LDA pat_width + 1
+        STA num + 1
+        LDA #' '
+        STA pad
+        JSR PrDec16
+
+        LDA #35
+        JSR tab_to_col
+        LDA pat_depth
+        STA num
+        LDA pat_depth + 1
+        STA num + 1
+        LDA #' '
+        STA pad
+        JSR PrDec16
 
         PLA
         TAX
