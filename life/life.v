@@ -292,8 +292,8 @@ module life (
          green <= 4'hF;
          blue  <= 4'hF;
       end else if (border) begin
-         red   <= 4'h0;
-         green <= 4'hF;
+         red   <= ctrl_mask_writes ? 4'hF : 4'h0;
+         green <= ctrl_mask_writes ? 4'h0 : 4'hF;
          blue  <= 4'h0;
       end else begin
          red   <= 4'h0;
