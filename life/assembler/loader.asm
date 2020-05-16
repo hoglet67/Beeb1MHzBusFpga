@@ -32,6 +32,15 @@ include "constants.asm"
 
         JSR OSRDCH
         JSR OSWRCH
+
+        CMP #' '
+        BNE not_space
+        LDA &FCA0
+        EOR #&40
+        STA &FCA0
+        JMP prompt
+
+.not_space
         CMP #'A'
         BCC prompt
         CMP last_pattern
