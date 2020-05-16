@@ -23,7 +23,9 @@ PATTERN_BASE    = 'A'
 TYPE_RLE        = 2
 TYPE_RANDOM     = 3
 
-NAME_WIDTH      = 20
+NAME_WIDTH      = 30
+
+AUTHOR_WIDTH    = 20
 
 pat_width       = &70
 pat_depth       = &72

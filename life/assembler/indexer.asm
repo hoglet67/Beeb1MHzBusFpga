@@ -39,6 +39,8 @@
         CLC
         ADC #'A'
         JSR OSWRCH
+        LDA #'.'
+        JSR OSWRCH
         LDA #' '
         JSR OSWRCH
 
@@ -71,9 +73,11 @@
 {
         LDA #' '
         JSR OSWRCH
+        JSR OSWRCH
 
-        LDA #&0D              ; Set a default name of NULL
+        LDA #&0D              ; Set a default name/author of NULL
         STA rle_name
+        STA rle_author
 
         TYA
         PHA
@@ -90,16 +94,29 @@
 
 
         LDX #&00
-.loop
+.loop1
         LDA rle_name, X
         CMP #&0D
-        BEQ done
+        BEQ done1
         JSR OSWRCH
         INX
-        BNE loop
-.done
+        BNE loop1
+.done1
 
-        LDA #30
+        LDA #50
+        JSR tab_to_col
+
+        LDX #&00
+.loop2
+        LDA rle_author, X
+        CMP #&0D
+        BEQ done2
+        JSR OSWRCH
+        INX
+        BNE loop2
+.done2
+
+        LDA #70
         JSR tab_to_col
         LDA pat_width
         STA num
@@ -109,7 +126,7 @@
         STA pad
         JSR PrDec16
 
-        LDA #35
+        LDA #75
         JSR tab_to_col
         LDA pat_depth
         STA num

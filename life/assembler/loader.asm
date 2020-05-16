@@ -6,7 +6,7 @@ include "constants.asm"
 
         JSR print_string
 
-        EQUB 22, 4
+        EQUB 22, 0
         EQUS "Conway Life for the BBC Micro", 10, 10, 13
         EQUS "Using the FPGA Engine", 10, 10, 13
         NOP

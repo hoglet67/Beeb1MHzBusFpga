@@ -41,6 +41,8 @@
         AND #&DF
         CMP #'N'
         BEQ save_name
+        CMP #'O'
+        BEQ save_author
 
         JSR skip_line
         JMP skip_comments
@@ -68,29 +70,58 @@
         JMP skip_line
 
 .save_name
+{
         JSR rle_next_byte
         JSR skip_whitespace
         LDX #&00
-.save_loop
+.loop
         STA rle_name, X
         INX
         JSR rle_next_byte
         LDA byte
         CMP #10
-        BEQ save_done
+        BEQ done
         CMP #13
-        BEQ save_done
+        BEQ done
         CPX #NAME_WIDTH
-        BNE save_loop
+        BNE loop
         JSR skip_line
-.save_done
+.done
         LDA #13
         STA rle_name, X
         JMP parse_rle_header
 }
 
+.save_author
+{
+        JSR rle_next_byte
+        JSR skip_whitespace
+        LDX #&00
+.loop
+        STA rle_author, X
+        INX
+        JSR rle_next_byte
+        LDA byte
+        CMP #10
+        BEQ done
+        CMP #13
+        BEQ done
+        CPX #NAME_WIDTH
+        BNE loop
+        JSR skip_line
+.done
+        LDA #13
+        STA rle_author, X
+        JMP parse_rle_header
+}
+
+}
+
 .rle_name
         SKIP NAME_WIDTH + 1
+
+.rle_author
+        SKIP AUTHOR_WIDTH + 1
 
 .parse_size
 {
