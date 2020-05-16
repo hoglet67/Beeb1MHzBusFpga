@@ -35,6 +35,13 @@
         LDA byte
         CMP #'#'
         BNE process
+
+        JSR rle_next_byte
+        LDA byte
+        AND #&DF
+        CMP #'N'
+        BEQ save_name
+
         JSR skip_line
         JMP skip_comments
 
@@ -59,8 +66,30 @@
 
 .not_y
         JMP skip_line
+
+.save_name
+        JSR rle_next_byte
+        JSR skip_whitespace
+        LDX #&00
+.save_loop
+        STA rle_name, X
+        INX
+        JSR rle_next_byte
+        LDA byte
+        CMP #10
+        BEQ save_done
+        CMP #13
+        BEQ save_done
+        CPX #&1F
+        BNE save_loop
+.save_done
+        LDA #13
+        STA rle_name, X
+        JMP parse_rle_header
 }
 
+.rle_name
+        SKIP 32
 
 .parse_size
 {

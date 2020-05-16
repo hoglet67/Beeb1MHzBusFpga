@@ -1,4 +1,4 @@
-org &2000
+org &1900
 
 include "constants.asm"
 
@@ -11,24 +11,33 @@ include "constants.asm"
         EQUS "Using the FPGA Engine", 10, 10, 13
         NOP
 
-        JSR list_patterns
-        PHA
+        JSR index_patterns
+        STA last_pattern
 
+        LDA #10
+        JSR OSWRCH
+
+.prompt
         JSR print_string
-        EQUB 10, 13
+        EQUB 13
         EQUS "Press key A-"
         NOP
 
-        PLA
+        LDA last_pattern
         JSR OSWRCH
 
         JSR print_string
-        EQUS " for initial pattern:"
+        EQUS " to load pattern:  ", 127
         NOP
 
         JSR OSRDCH
         JSR OSWRCH
-
+        CMP #'A'
+        BCC prompt
+        CMP last_pattern
+        BEQ ok
+        BCS prompt
+.ok
         PHA
 
         ; Stop the Life Engine
@@ -43,7 +52,7 @@ include "constants.asm"
         JSR clear_screen
 
         PLA                     ; create initial pattern
-        JSR draw_pattern
+        JSR load_pattern
 
         ; Start the Life Engine
         LDA &FCA0
@@ -53,17 +62,15 @@ include "constants.asm"
         BIT &FCA0
         BPL wait2
 
-
-        JMP start
-
-
-include "patterns.asm"
+        JMP prompt
 
 include "rle_reader_fpga.asm"
 
 include "rle_utils.asm"
 
 include "utils.asm"
+
+include "indexer.asm"
 
 .end
 

@@ -1,6 +1,7 @@
 #!/bin/bash
 
 BUILD=$(date +"%Y%m%d_%H%M")
+#BUILD=dev
 
 NAME=beeb_fpga_life_$BUILD
 
@@ -43,7 +44,7 @@ do
     fi
 
     # Create the .inf file
-    echo -e "\$."${name}"\t2000\t2000" > ../${build}/${name}.inf
+    echo -e "\$."${name}"\t1900\t1900" > ../${build}/${name}.inf
 
     # Add into the SSD
     beeb putfile ../${build}/${ssd} ../${build}/${name}

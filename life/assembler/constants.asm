@@ -7,12 +7,15 @@ X_ORIGIN        = X_WIDTH / 2
 Y_ORIGIN        = Y_WIDTH / 2
 
 OSFIND          = &FFCE
+OSGBPB          = &FFD1
 OSBGET          = &FFD7
 OSRDCH          = &FFE0
 OSASCI          = &FFE3
+OSNEWL          = &FFE7
 OSWRCH          = &FFEE
 OSWORD          = &FFF1
 OSBYTE          = &FFF4
+OSCLI           = &FFF7
 
 
 PATTERN_BASE    = 'A'
@@ -30,14 +33,17 @@ temp            = &78
 xx              = &7A
 yy              = &7C
 
+ptr             = &7E
+
 multiplicand    = &80
 multiplier      = &83
 accumulator     = &84
-tmp             = &87
 
+last_pattern    = &87
 src             = &88
 dst             = &8A
-
+tmp             = &8C
+piv             = &8E
 
 MACRO M_INCREMENT zp
         INC zp

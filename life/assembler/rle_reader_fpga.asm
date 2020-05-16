@@ -367,3 +367,6 @@
         LDA seed
         RTS
 }
+
+.seed
+        EQUB &11, &22, &33, &44, &55
