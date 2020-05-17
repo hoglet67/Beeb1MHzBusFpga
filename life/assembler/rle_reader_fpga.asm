@@ -61,12 +61,16 @@
 
 .insert_cells
         JSR default_count
+
+        ; Calculate the FB address of xx,yy and set the paging registers appropriately
+        JSR set_framebuffer_address
+
 .cells_loop
         LDA count
         ORA count + 1
         BEQ continue
 
-        ; Set Cell at xx, yy
+        ; Set Cell at xx, yy; increment the framebuffer address
         JSR set_cell_in_framebuffer
 
         M_INCREMENT xx
@@ -179,13 +183,11 @@
         RTS
 }
 
-; Need to compute (yy * row_width_in_bytes) + (xx / 8)
+; Compute (yy * row_width_in_bytes) + (xx / 8) and set the paging registers
 
-.set_cell_in_framebuffer
+.set_framebuffer_address
 {
     TXA
-    PHA
-    TYA
     PHA
 
     LDA reg_x_size
@@ -214,27 +216,50 @@
     ADC #0
     STA accumulator + 2
 
-    LDA xx
-    AND #&07
-    TAY
-
-    ;; Set the bit in the frame buffer
     LDA accumulator + 2
     AND #&07
     ORA #BASE
     STA reg_page_hi
     LDA accumulator + 1
     STA reg_page_lo
+
+    PLA
+    TAX
+    RTS
+}
+
+.set_cell_in_framebuffer
+{
+    TXA
+    PHA
+
+    LDA xx
+    AND #&07
+    TAY
+
     LDX accumulator
     LDA reg_jim, X
     ORA mask, Y
     STA reg_jim, X
 
-    PLA
-    TAY
+    CPY #7
+    BNE exit
+    INC accumulator
+    BNE exit
+    CLC
+    LDA accumulator + 1
+    ADC #1
+    STA accumulator + 1
+    STA reg_page_lo
+    BCC exit
+    LDA accumulator + 2
+    ADC #0
+    STA accumulator + 2
+    STA reg_page_hi
+
+.exit
     PLA
     TAX
-
     RTS
 
 .mask
