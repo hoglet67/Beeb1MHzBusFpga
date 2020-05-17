@@ -63,7 +63,7 @@ done
 cd ..
 
 # Add the patterns
-cd patterns
+cd patterns0
 for pattern in `ls * | sort`
 do
     # Copy the pattern into the R directory
