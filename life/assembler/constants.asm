@@ -42,8 +42,9 @@ accumulator     = &84       ; used by maths code, 3 bytes
 piv             = &87       ; workspace, used by quick sort
 pad             = byte      ; workspace, used by quick sort
 num             = tmp       ; workspace, used by quick sort
-
-                            ; &88-&8F currently free
+fast_flag       = &88       ; workspace, used by rle_reader, rle_utils
+buf_index       = &89       ; workspace, used by rle_reader, rle_utils
+                            ; &8A-&8F currently free
 
 MACRO M_INCREMENT zp
         INC zp

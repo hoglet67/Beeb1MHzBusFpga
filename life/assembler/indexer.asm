@@ -100,6 +100,8 @@
         TXA
         PHA
 
+        LDX #&00
+        STX fast_flag
         JSR open_pattern      ; Pass filename index in A
 
         JSR rle_next_byte
@@ -160,18 +162,29 @@
 
 
 .load_pattern
+{
         SEC
         SBC #'A'
+        LDX #&80
+        STX fast_flag
         JSR open_pattern
         JSR rle_next_byte       ; rle_reader expects first byte of file read
         JSR rle_reader
+}
 
 .close_pattern
+{
+        BIT fast_flag
+        BMI fast
         LDA #&00                ; close the file
         LDY handle
-        JMP OSFIND
+        JSR OSFIND
+.fast
+        RTS
+}
 
 .open_pattern
+{
         TAY
         LDA nameptr_lo, Y
         STA tmp
@@ -179,12 +192,19 @@
         LDA nameptr_hi, Y
         STA tmp + 1
         TAY
+        BIT fast_flag
+        BMI fast
         LDA #&40
         JSR OSFIND
         CMP #&00                ; returns file handle in A, or 0 if not found
         BEQ not_found_error
         STA handle              ; save the file handle
         RTS
+.fast
+        JSR rle_open_fast
+        BCS not_found_error
+        RTS
+}
 
 .not_found_error
 {
