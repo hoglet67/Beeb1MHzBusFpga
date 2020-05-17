@@ -1,5 +1,10 @@
 #!/bin/bash
 
+# Tools required on the path:
+#
+# 1. BeebASM - https://github.com/stardot/beebasm/release/latest
+# 2. MMB/SSD Utils in Perl - https://sweh.spuddy.org/Beeb/mmb_utils.tar
+
 BUILD=$(date +"%Y%m%d_%H%M")
 #BUILD=dev
 
