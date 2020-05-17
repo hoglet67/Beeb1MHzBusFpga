@@ -165,9 +165,9 @@
         ROL count + 1
 
         LDA count               ; tmp = count
-        STA temp
+        STA tmp
         LDA count + 1
-        STA temp + 1
+        STA tmp + 1
 
         ASL count               ; count *= 4
         ROL count + 1
@@ -176,10 +176,10 @@
 
         LDA count               ; count += tmp
         CLC
-        ADC temp
+        ADC tmp
         STA count
         LDA count + 1
-        ADC temp + 1
+        ADC tmp + 1
         STA count + 1
         RTS
 }

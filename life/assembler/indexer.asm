@@ -29,10 +29,10 @@
         LDX #0
 .prloop1
         LDA nameptr_lo, X
-        STA ptr
+        STA tmp
         LDA nameptr_hi, X
-        STA ptr + 1
-        ORA ptr
+        STA tmp + 1
+        ORA tmp
         BEQ prdone
 
         TXA
@@ -46,7 +46,7 @@
 
         LDY #&00
 .prloop2
-        LDA (ptr), Y
+        LDA (tmp), Y
         CMP #&0D
         BEQ prmeta
         JSR OSWRCH
@@ -159,8 +159,10 @@
 .open_pattern
         TAY
         LDA nameptr_lo, Y
+        STA tmp
         TAX
         LDA nameptr_hi, Y
+        STA tmp + 1
         TAY
         LDA #&40
         JSR OSFIND
@@ -176,7 +178,7 @@
         LDY #&FF
 .loop
         INY
-        LDA (src), Y
+        LDA (tmp), Y
         JSR OSASCI
         CMP #&0D
         BNE loop

@@ -27,30 +27,24 @@ NAME_WIDTH      = 30
 
 AUTHOR_WIDTH    = 20
 
-pat_width       = &70
-pat_depth       = &72
-count           = &74
-handle          = &76
-byte            = &77
+pat_width       = &70       ; pattern width, used by rle_reader, rle_utils and indexer
+pat_depth       = &72       ; pattern depth, used by rle_reader, rle_utils and indexer
+handle          = &74       ; file handle,   used by rle_reader, rle_utils and indexer
+byte            = &75       ; workspace, used by rle_reader, rle_utils
+xx              = &76       ; workspace, used by rle_reader, rle_utils
+yy              = &78       ; workspace, used by rle_reader, rle_utils
+count           = &7A       ; workspace, used by rle_reader, rle_utils
+tmp             = &7C       ; short term temporary storage
+last_pattern    = &7E       ; last patten on disk, used by loader
+drive           = &7F       ; current drive, used by loader and indexer
+multiplicand    = &80       ; used by maths code, 3 bytes
+multiplier      = &83       ; used by maths code, 1 bytes
+accumulator     = &84       ; used by maths code, 3 bytes
+piv             = &87       ; workspace, used by quick sort
+pad             = byte      ; workspace, used by quick sort
+num             = tmp       ; workspace, used by quick sort
 
-temp            = &78
-xx              = &7A
-yy              = &7C
-
-ptr             = &7E
-
-multiplicand    = &80
-multiplier      = &83
-accumulator     = &84
-
-last_pattern    = &87
-src             = &88
-dst             = &8A
-tmp             = &8C
-piv             = &8E
-
-pad             = byte
-num             = temp
+                            ; &88-&8F currently free
 
 MACRO M_INCREMENT zp
         INC zp
