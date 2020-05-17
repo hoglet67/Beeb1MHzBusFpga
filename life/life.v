@@ -263,7 +263,7 @@ module life (
          else
            v_counter_next = v_counter + 1'b1;
       end else begin
-			v_counter_next = v_counter;
+         v_counter_next = v_counter;
          h_counter_next = h_counter + 1'b1;
       end
    end
