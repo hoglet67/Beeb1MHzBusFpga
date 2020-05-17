@@ -1,0 +1,16 @@
+#N Sir Robin (2,1)c/6 knightship
+#O Adam P. Goucher
+#C (2,1)c/6 knightship found by
+#C based on a front end originally found by Josh Ball,
+#C rediscovered and extended by Tomas Rokicki,
+#C using a SAT solver-based search
+x = 79, y = 31, rule = B3/S23
+8bo$6bo2bo$4b2obo3bo$4bo2bo3bo$3o2bobo$o4bobobo$3bo2bo3bo$bobo6bo$2b2o
+6bo2$4b2ob2o4bob4o11bo$4b2ob2ob2ob3o2b2obob2o4bobo$4b2o4bo3bobobo6b2o$
+4b3o5bo4bobo6bob2o2b2o$6bo7bo5bo5bob3obo$6b2o2bobob4ob2o3bo3b2o2b2o$
+11b2obobo10bo3b3o22bo$17bo2bo6bob3obo24bo$13b3o5bo3bo2bo3b2o9bo8b3o3bo
+$18b4o3bo5bo2bo4bob2obo5b3o5bo$21bo3bo5bo3b2o2b2o3b2o3b2ob2obobo$23bob
+o5bo4b2obo5bob2obo2bo2b2o6bobo$24b2o11bo2bo4b2obobob2o2b2o5b2o2bo2b2o$
+32b2obobo3b2o2b2o3bob2o2b2o5b2o2bo2b3o$32b2obobo4bobo3bo2b3o2bob2obo3b
+2obob4o3bo$37b2o4bo13bo4bo2b3o5b3obo$38bobo4bo11bobo2bo3bob2o4bo3bo$
+41bobo2bo14b2o6bo3bo$39b2o2b2o15b2o3b3o4b2o$43b3o18bo3bob3o$65b2obo3bo!
