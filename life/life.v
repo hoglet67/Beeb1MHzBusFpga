@@ -210,6 +210,9 @@ module life (
    wire                ctrl_running     = control[7];
    wire                ctrl_mask_writes = control[6];
 
+   wire [7:0]          width_div_8 = H_ACTIVE / 8;
+   wire [7:0]          height_div_8 = V_ACTIVE / 8;
+
    // =================================================
    // Clock Generation
    // =================================================
@@ -467,11 +470,14 @@ module life (
    assign bus_data = (!pgfc_n && bus_addr == 8'hFF && rnw) ? {selected, 4'b0000, cpu_addr[18:16]} :
                      (!pgfc_n && bus_addr == 8'hFE && rnw) ? cpu_addr[15:8]                       :
                      (!pgfc_n && bus_addr == 8'hA0 && rnw) ? {running, control[6:0]}              :
+                     (!pgfc_n && bus_addr == 8'hA1 && rnw) ?  width_div_8                         :
+                     (!pgfc_n && bus_addr == 8'hA2 && rnw) ?  height_div_8                        :
+                     (!pgfc_n && bus_addr == 8'hA3 && rnw) ?  8'hAA                               :
                      (!pgfd_n && selected          && rnw) ? cpu_rd_data                          :
                      8'hZZ;
 
    assign bus_data_oel = !(
-                           (clke && !pgfc_n && (bus_addr == 8'hA0 || bus_addr == 8'hFE || bus_addr == 8'hFF)) ||
+                           (clke && !pgfc_n && ({bus_addr[7:2], 2'b00}  == 8'hA0 || bus_addr == 8'hFE || bus_addr == 8'hFF)) ||
                            (clke && !pgfd_n && selected));
 
    assign bus_data_dir = rnw;
