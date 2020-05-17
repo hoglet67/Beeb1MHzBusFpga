@@ -2,8 +2,8 @@
 
 # Tools required on the path:
 #
-# 1. BeebASM - https://github.com/stardot/beebasm/release/latest
-# 2. MMB/SSD Utils in Perl - https://sweh.spuddy.org/Beeb/mmb_utils.tar
+# 1. BeebASM - https://github.com/stardot/beebasm
+# 2. MMB/SSD Utils in Perl - https://github.com/sweharris/MMB_Utils
 
 BUILD=$(date +"%Y%m%d_%H%M")
 #BUILD=dev
