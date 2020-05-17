@@ -142,20 +142,40 @@
         ROR pat_width
         LSR pat_depth + 1
         ROR pat_depth
-        LDA #<X_ORIGIN          ; on exit pat_width contains the X coord to load the pattern at
+        LDA reg_x_size
+        LSR A
+        JSR multiply_by_8
+        LDA tmp                 ; on exit pat_width contains the X coord to load the pattern at
         SEC
         SBC pat_width
         STA pat_width
-        LDA #>X_ORIGIN
+        LDA tmp + 1
         SBC pat_width + 1
         STA pat_width + 1
-        LDA #<Y_ORIGIN          ; on exit pat_depth contains the Y coord to load the pattern at
+        LDA reg_y_size
+        LSR A
+        JSR multiply_by_8
+        LDA tmp                 ; on exit pat_depth contains the Y coord to load the pattern at
         SEC
         SBC pat_depth
         STA pat_depth
-        LDA #>Y_ORIGIN
+        LDA tmp + 1
         SBC pat_depth + 1
         STA pat_depth + 1
+        RTS
+}
+
+.multiply_by_8
+{
+        STA tmp
+        LDA #0
+        STA tmp + 1
+        ASL tmp
+        ROL tmp + 1
+        ASL tmp
+        ROL tmp + 1
+        ASL tmp
+        ROL tmp + 1
         RTS
 }
 
@@ -168,42 +188,10 @@
     TYA
     PHA
 
-    LDA yy
-    STA multiplicand
-    LDA yy + 1
-    STA multiplicand + 1
-    LDA #0
-    STA multiplicand + 2
-    STA accumulator
-    STA accumulator + 1
-    STA accumulator + 2
-    LDA #(X_WIDTH / 8)
-    STA multiplier
+    LDA reg_x_size
+    LDX #yy
+    JSR multiply_8_by_16
 
-.loop
-    LDA multiplier
-    BEQ done
-    LSR multiplier
-    BCC next
-
-    CLC
-    LDA accumulator
-    ADC multiplicand
-    STA accumulator
-    LDA accumulator + 1
-    ADC multiplicand + 1
-    STA accumulator + 1
-    LDA accumulator + 2
-    ADC multiplicand + 2
-    STA accumulator + 2
-
-.next
-    ASL multiplicand
-    ROL multiplicand + 1
-    ROL multiplicand + 2
-    JMP loop
-
-.done
     ;; accumulator += x/8
     LDA xx
     STA multiplicand
@@ -234,13 +222,13 @@
     LDA accumulator + 2
     AND #&07
     ORA #BASE
-    STA &FCFF
+    STA reg_page_hi
     LDA accumulator + 1
-    STA &FCFE
+    STA reg_page_lo
     LDX accumulator
-    LDA &FD00,X
+    LDA reg_jim, X
     ORA mask, Y
-    STA &FD00,X
+    STA reg_jim, X
 
     PLA
     TAY
@@ -257,116 +245,48 @@
 .clear_screen
 {
         LDA #BASE
-        STA &FCFF
+        STA reg_page_hi
+
+        ; Work out the address of the end of the frame buffer
+        LDA #0
+        STA tmp + 1
+        LDA reg_y_size  ; y_size is number of lines DIV 8
+        ASL A
+        ROL tmp + 1
+        ASL A
+        ROL tmp + 1
+        ASL A
+        ROL tmp + 1
+        STA tmp
+
+        LDA reg_x_size
+        LDX #tmp
+        JSR multiply_8_by_16
+
+        ;; 24-bit accumulator = end address of frame buffer
+        LDA accumulator + 2
+        CLC
+        ADC #1
+        ORA #BASE
+        STA accumulator + 2
+
         LDX #0
         LDY #0
 .loop1
-        STX &FCFE
+        STX reg_page_lo
         LDA #0
 .loop2
-        STA &FD00,Y
+        STA reg_jim, Y
         INY
         BNE loop2
         INX
         BNE loop1
-        LDA &FCFF
+        LDA reg_page_hi
         CLC
         ADC #1
         ORA #BASE
-        STA &FCFF
-        CMP #BASE + 1 + ((X_WIDTH * Y_WIDTH) DIV &80000)
+        STA reg_page_hi
+        CMP accumulator + 2
         BNE loop1
         RTS
 }
-
-
-.random_pattern
-{
-
-        PHA                    ; stack the pattern density 1-3
-
-        ;; Seed by reading system VIA T1C (&FE44)
-
-        LDX #4
-.seed_loop
-        TXA
-        PHA
-        LDA #&96
-        LDX #&44
-        JSR OSBYTE
-        TYA
-        PLA
-        TAX
-        STA seed, X
-        DEX
-        BPL seed_loop
-        PLA                     ; restore the pattern density
-        TAX
-        LDA #BASE
-        STA &FCFF
-        LDA #0
-        STA &FCFE
-        LDY #0
-.write_loop
-        LDA #&FF
-        STA temp
-        JSR random
-        AND temp
-        STA temp
-        JSR random
-        AND temp
-        STA temp
-        CPX #3
-        BCS random_next
-        JSR random
-        AND temp
-        STA temp
-        CPX #2
-        BCS random_next
-        JSR random
-        AND temp
-        STA temp
-.random_next
-        LDA temp
-        STA &FD00,Y
-        INY
-        BNE write_loop
-        INC &FCFE
-        BNE write_loop
-        LDA &FCFF
-        CLC
-        ADC #1
-        ORA #BASE
-        STA &FCFF
-        CMP #BASE + 1 + ((X_WIDTH * Y_WIDTH) DIV &80000)
-        BNE write_loop
-        RTS
-}
-
-.random
-{
-        TXA
-        PHA
-        LDX #8
-.loop
-        LDA seed + 2
-        LSR A
-        LSR A
-        LSR A
-        EOR seed + 4
-        ROR A
-        ROL seed
-        ROL seed + 1
-        ROL seed + 2
-        ROL seed + 3
-        ROL seed + 4
-        DEX
-        BNE loop
-        PLA
-        TAX
-        LDA seed
-        RTS
-}
-
-.seed
-        EQUB &11, &22, &33, &44, &55

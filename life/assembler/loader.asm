@@ -35,9 +35,9 @@ include "constants.asm"
 
         CMP #' '
         BNE not_space
-        LDA &FCA0
+        LDA reg_control
         EOR #&40
-        STA &FCA0
+        STA reg_control
         JMP prompt
 
 .not_space
@@ -50,11 +50,11 @@ include "constants.asm"
         PHA
 
         ; Stop the Life Engine
-        LDA &FCA0
+        LDA reg_control
         AND #&7F
-        STA &FCA0
+        STA reg_control
 .wait1
-        BIT &FCA0
+        BIT reg_control
         BMI wait1
 
 
@@ -64,11 +64,11 @@ include "constants.asm"
         JSR load_pattern
 
         ; Start the Life Engine
-        LDA &FCA0
+        LDA reg_control
         ORA #&80
-        STA &FCA0
+        STA reg_control
 .wait2
-        BIT &FCA0
+        BIT reg_control
         BPL wait2
 
         JMP prompt

@@ -1,10 +1,11 @@
 BASE            = &C8
 
-X_WIDTH         = 1600
-Y_WIDTH         = 1200
-
-X_ORIGIN        = X_WIDTH / 2
-Y_ORIGIN        = Y_WIDTH / 2
+reg_control     = &FCA0
+reg_x_size      = &FCA1
+reg_y_size      = &FCA2
+reg_page_lo     = &FCFE
+reg_page_hi     = &FCFF
+reg_jim         = &FD00
 
 OSFIND          = &FFCE
 OSGBPB          = &FFD1
@@ -16,7 +17,6 @@ OSWRCH          = &FFEE
 OSWORD          = &FFF1
 OSBYTE          = &FFF4
 OSCLI           = &FFF7
-
 
 PATTERN_BASE    = 'A'
 

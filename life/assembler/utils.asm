@@ -99,3 +99,51 @@
         EQUW 1000
         EQUW 10000
 }
+
+
+;; ************************************************************
+;; Print 16-bit decimal number
+;; ************************************************************
+
+;; 8 bit multiplier in A
+;; 16-bit muliplicand in zero page X, X+1
+
+.multiply_8_by_16
+{
+    STA multiplier
+    LDA 0, X
+    STA multiplicand
+    LDA 1, X
+    STA multiplicand + 1
+    LDA #0
+    STA multiplicand + 2
+    STA accumulator
+    STA accumulator + 1
+    STA accumulator + 2
+
+.loop
+    LDA multiplier
+    BEQ done
+    LSR multiplier
+    BCC next
+
+    CLC
+    LDA accumulator
+    ADC multiplicand
+    STA accumulator
+    LDA accumulator + 1
+    ADC multiplicand + 1
+    STA accumulator + 1
+    LDA accumulator + 2
+    ADC multiplicand + 2
+    STA accumulator + 2
+
+.next
+    ASL multiplicand
+    ROL multiplicand + 1
+    ROL multiplicand + 2
+    JMP loop
+
+.done
+    RTS
+}
