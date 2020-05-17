@@ -1,5 +1,10 @@
 .index_patterns
 {
+        ; Select the drive
+        LDX #<star_drive_n
+        LDY #>star_drive_n
+        JSR OSCLI
+
         ; Set the directory to R
         LDX #<star_dir_r
         LDY #>star_dir_r
@@ -9,6 +14,8 @@
 
         LDX #0   ; X is index of the lowest element
         DEY      ; Y is index of the highest element
+
+        BMI prnone  ; exit with C=1 if no patterns
 
         ; Push the letter of the last pattern (as the return value)
         TYA
@@ -61,12 +68,20 @@
         BNE prloop1
 .prdone
         PLA
+        CLC
+        RTS
+.prnone
+        SEC
         RTS
 
 .star_dir_r
         EQUB "DIR R", 13
 
+.star_drive_n
+        EQUB "DRIVE "
 }
+.drive
+        EQUB "0", 13
 
 
 .print_metadata

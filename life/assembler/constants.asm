@@ -36,7 +36,6 @@ yy              = &78       ; workspace, used by rle_reader, rle_utils
 count           = &7A       ; workspace, used by rle_reader, rle_utils
 tmp             = &7C       ; short term temporary storage
 last_pattern    = &7E       ; last patten on disk, used by loader
-drive           = &7F       ; current drive, used by loader and indexer
 multiplicand    = &80       ; used by maths code, 3 bytes
 multiplier      = &83       ; used by maths code, 1 bytes
 accumulator     = &84       ; used by maths code, 3 bytes

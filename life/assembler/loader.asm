@@ -3,15 +3,49 @@ org &1900
 include "constants.asm"
 
 .start
+        LDA #'0'
+        STA drive
+        JMP main
 
+.no_patterns
+{
         JSR print_string
+        EQUS "No patterns on the current drive", 10, 10
+        NOP
+.loop
+        JSR print_string
+        EQUS 13, "Press 0-3 to select another drive:  ", 127
+        NOP
+        JSR OSRDCH
+        JSR OSWRCH
+        CMP #'0'
+        BCC loop
+        CMP #'3'+1
+        BCS loop
+        STA drive
+}
 
+.main
+{
+        JSR print_string
         EQUB 22, 0
         EQUS "Conway Life for the BBC Micro", 10, 10, 13
-        EQUS "Using the FPGA Engine", 10, 10, 13
+        EQUS "Using the FPGA Engine"
         NOP
+        LDA #72
+        JSR tab_to_col
+        JSR print_string
+        EQUS "Drive: "
+        NOP
+        LDA drive
+        JSR OSWRCH
+        JSR OSNEWL
 
         JSR index_patterns
+        BCC save_last
+        JMP no_patterns
+
+.save_last
         STA last_pattern
 
         LDA #10
@@ -20,7 +54,7 @@ include "constants.asm"
 .prompt
         JSR print_string
         EQUB 13
-        EQUS "Press key A-"
+        EQUS "Press 0-3 to select drive, A-"
         NOP
 
         LDA last_pattern
@@ -33,6 +67,14 @@ include "constants.asm"
         JSR OSRDCH
         JSR OSWRCH
 
+        CMP #'0'
+        BCC not_drive
+        CMP #'3'+1
+        BCS not_drive
+        STA drive
+        JMP main
+
+.not_drive
         CMP #' '
         BNE not_space
         LDA reg_control
@@ -57,7 +99,6 @@ include "constants.asm"
         BIT reg_control
         BMI wait1
 
-
         JSR clear_screen
 
         PLA                     ; create initial pattern
@@ -72,6 +113,7 @@ include "constants.asm"
         BPL wait2
 
         JMP prompt
+}
 
 include "rle_reader_fpga.asm"
 
