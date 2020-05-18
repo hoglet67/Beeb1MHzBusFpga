@@ -1,11 +1,19 @@
 BASE            = &C8
 
 reg_control     = &FCA0
-reg_x_size      = &FCA1
-reg_y_size      = &FCA2
+reg_status      = &FCA1
+reg_x_size      = &FCA2
+reg_y_size      = &FCA3
 reg_page_lo     = &FCFE
 reg_page_hi     = &FCFF
 reg_jim         = &FD00
+
+ctrl_running    = &80
+ctrl_mask       = &40
+ctrl_clear      = &20
+
+st_running      = &80
+st_vsync        = &40
 
 OSFIND          = &FFCE
 OSGBPB          = &FFD1

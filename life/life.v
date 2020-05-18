@@ -208,10 +208,19 @@ module life (
    reg [7:0]           control = 8'h80;
 
    wire                ctrl_running     = control[7];
-   wire                ctrl_mask_writes = control[6];
+   wire                ctrl_mask        = control[6];
+   wire                ctrl_clear       = control[5];
+   wire [1:0]          ctrl_clear_type  = control[1:0];
+
+   wire [7:0]          status = { running, vsync, 6'b000000};
 
    wire [7:0]          width_div_8 = H_ACTIVE / 8;
    wire [7:0]          height_div_8 = V_ACTIVE / 8;
+
+   reg [7:0]           clear_wr_data;
+   reg [30:0]          prbs0 = 31'h12345678; // pick different seeds at random
+   reg [30:0]          prbs1 = 31'h49987ffe;
+   reg [30:0]          prbs2 = 31'h2fe457aa;
 
    // =================================================
    // Clock Generation
@@ -295,8 +304,8 @@ module life (
          green <= 4'hF;
          blue  <= 4'hF;
       end else if (border) begin
-         red   <= ctrl_mask_writes ? 4'hF : 4'h0;
-         green <= ctrl_mask_writes ? 4'h0 : 4'hF;
+         red   <= ctrl_mask ? 4'hF : 4'h0;
+         green <= ctrl_mask ? 4'h0 : 4'hF;
          blue  <= 4'h0;
       end else begin
          red   <= 4'h0;
@@ -375,16 +384,16 @@ module life (
          // Compute the mask for the next write cycle (to prevent wrapping)
          //  (v_counter is 1 line ahead of the write address)
          //  (h_counter is 2 bytes ahead of the write address)
-         if (ctrl_mask_writes && v_counter == 1)
+         if (ctrl_mask && v_counter == 1)
            // Top
            mask <= 8'h00;
-         else if (ctrl_mask_writes && v_counter == 0)
+         else if (ctrl_mask && v_counter == 0)
            // Bottom
            mask <= 8'h00;
-         else if (ctrl_mask_writes && h_counter[11:3] == 2)
+         else if (ctrl_mask && h_counter[11:3] == 2)
            // Left
            mask <= 8'h7f;
-         else if (ctrl_mask_writes && h_counter[11:3] == 1)
+         else if (ctrl_mask && h_counter[11:3] == 1)
            // Right
            mask <= 8'hfe;
          else
@@ -397,7 +406,10 @@ module life (
          ram_oel <= 1'b1;
          ram_addr <= ram_wr_addr;
          if (h_counter[1:0] == 0)
-           ram_din <= nextgen8 & mask;
+           if (ctrl_clear)
+             ram_din <= clear_wr_data;
+           else
+             ram_din <= nextgen8 & mask;
          if (h_counter[1:0] == 1 || h_counter[1:0] == 2)
            ram_wel <= 1'b0;
          else
@@ -434,6 +446,27 @@ module life (
 
    assign ram_data = ram_wel ? 8'hZZ : ram_din;
 
+
+   // =================================================
+   // Data generator for clearing
+   // =================================================
+
+   always @(posedge clk_pixel) begin
+      case (ctrl_clear_type)
+        2'b01:
+          clear_wr_data <= prbs0[7:0] & prbs1[7:0] & prbs2[7:0];
+        2'b10:
+          clear_wr_data <= prbs0[7:0] & prbs1[7:0];
+        2'b11:
+          clear_wr_data <= prbs0[7:0];
+        default:
+          clear_wr_data <= 8'h00;
+      endcase
+      prbs0 <= {prbs0[29:0], prbs0[27] ^ prbs0[30]};
+      prbs1 <= {prbs1[29:0], prbs1[27] ^ prbs1[30]};
+      prbs2 <= {prbs2[29:0], prbs2[27] ^ prbs2[30]};
+   end
+
    // =================================================
    // 1MHz Bus Interface
    // =================================================
@@ -469,10 +502,10 @@ module life (
 
    assign bus_data = (!pgfc_n && bus_addr == 8'hFF && rnw) ? {selected, 4'b0000, cpu_addr[18:16]} :
                      (!pgfc_n && bus_addr == 8'hFE && rnw) ? cpu_addr[15:8]                       :
-                     (!pgfc_n && bus_addr == 8'hA0 && rnw) ? {running, control[6:0]}              :
-                     (!pgfc_n && bus_addr == 8'hA1 && rnw) ?  width_div_8                         :
-                     (!pgfc_n && bus_addr == 8'hA2 && rnw) ?  height_div_8                        :
-                     (!pgfc_n && bus_addr == 8'hA3 && rnw) ?  8'hAA                               :
+                     (!pgfc_n && bus_addr == 8'hA0 && rnw) ? control                              :
+                     (!pgfc_n && bus_addr == 8'hA1 && rnw) ? status                               :
+                     (!pgfc_n && bus_addr == 8'hA2 && rnw) ? width_div_8                          :
+                     (!pgfc_n && bus_addr == 8'hA3 && rnw) ? height_div_8                         :
                      (!pgfd_n && selected          && rnw) ? cpu_rd_data                          :
                      8'hZZ;
 
