@@ -72,6 +72,12 @@ include "constants.asm"
         JMP main                ; main will reindex the new disk
 
 .not_drive
+        CMP #&09
+        BNE not_step
+        JSR engine_step
+        JMP prompt
+
+.not_step
         CMP #' '
         BNE not_space
         JSR mask_toggle
@@ -189,6 +195,15 @@ include "constants.asm"
         BIT reg_control
         BMI engine_stop
         BPL engine_start
+}
+
+.engine_step
+{
+        JSR wait_for_vsync
+        JSR engine_start
+        JSR wait_for_vsync
+        JSR engine_stop
+        RTS
 }
 
 .mask_toggle
