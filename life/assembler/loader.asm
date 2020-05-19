@@ -6,6 +6,8 @@ include "constants.asm"
         LDA #'0'
         STA drive
 
+        JSR reset_scaler
+
         ;; Set the cursor keys to return &87-&8B
         LDA #&04
         LDX #&01
@@ -67,6 +69,10 @@ include "constants.asm"
         LDA #10
         JSR OSWRCH
 
+        JSR print_string
+        EQUS "Z/X/CURSOR/TAB=pan/zoom, SPACE=stop/start, RETURN=step, COPY=mask edges", 10, 13
+        NOP
+
 .prompt
         JSR display_prompt
         JSR read_key
@@ -79,11 +85,17 @@ include "constants.asm"
 
 .not_drive
         CMP #&09
-        BNE not_step
+        BNE not_tab
+        JSR reset_scaler
+        JMP prompt
+
+.not_tab
+        CMP #&87
+        BNE not_copy
         JSR mask_toggle
         JMP prompt
 
-.not_step
+.not_copy
         CMP #' '
         BNE not_space
         JSR engine_toggle
@@ -105,12 +117,18 @@ include "constants.asm"
         JMP prompt
 
 .not_fn
-        CMP #&87
-        BNE not_zoom
-        JSR zoom_cycle
+        CMP #'Z'
+        BNE not_z
+        JSR zoom_inc
         JMP prompt
 
-.not_zoom
+.not_z
+        CMP #'X'
+        BNE not_x
+        JSR zoom_dec
+        JMP prompt
+
+.not_x
         CMP #&88
         BNE not_left
         JSR pan_left
@@ -136,33 +154,34 @@ include "constants.asm"
 
 .not_up
         CMP #'A'
-        BCC prompt
+        BCC notok
         CMP last_pattern
         BEQ ok
-        BCC ok
-        JMP prompt
-
+        BCS notok
 .ok
         PHA
         LDA #&00                ; Clear to blank
         JSR clear_screen
         PLA                     ; create initial pattern
         JSR load_pattern
+.notok
         JMP prompt
 }
 
+
 .display_prompt
 {
+
         JSR print_string
         EQUB 13
-        EQUS "Press 0-3 to select drive, F1-F3 for random, A-"
+        EQUS "0-3=select drive, F1-F3=random, A-"
         NOP
 
         LDA last_pattern
         JSR OSWRCH
 
         JSR print_string
-        EQUS " to load pattern:  ", 127
+        EQUS "=load pattern:  ", 127
         NOP
         RTS
 }
@@ -254,90 +273,138 @@ include "constants.asm"
         RTS
 }
 
-.zoom_cycle
+.zoom_dec
 {
-        LDA scaler_zoom
-        CLC
-        ADC #1
-        CMP #&05
-        BCC ok
-        LDA #0
-.ok
-        STA scaler_zoom
+        LDX reg_scaler_zoom
+        CPX #MIN_ZOOM
+        BCC exit
+        BEQ exit
+        DEX
+        JSR wait_for_vsync
+        STX reg_scaler_zoom
+.exit
+        RTS
+}
+
+.zoom_inc
+{
+        LDX reg_scaler_zoom
+        CPX #MAX_ZOOM
+        BCS exit
+        INX
+        JSR wait_for_vsync
+        STX reg_scaler_zoom
+.exit
         RTS
 }
 
 .pan_right
 {
-        LDA scaler_zoom
+        JSR wait_for_vsync
+        LDA reg_scaler_zoom
         AND #&07
         TAX
-        LDA scaler_x_offset
+        LDA reg_scaler_x_origin
         SEC
         SBC jump_amount, X
-        STA scaler_x_offset
-        LDA scaler_x_offset + 1
+        STA reg_scaler_x_origin
+        LDA reg_scaler_x_origin + 1
         SBC #&00
-        STA scaler_x_offset + 1
+        STA reg_scaler_x_origin + 1
         RTS
 }
 
 .pan_left
 {
-        LDA scaler_zoom
+        JSR wait_for_vsync
+        LDA reg_scaler_zoom
         AND #&07
         TAX
-        LDA scaler_x_offset
+        LDA reg_scaler_x_origin
         CLC
         ADC jump_amount, X
-        STA scaler_x_offset
-        LDA scaler_x_offset + 1
+        STA reg_scaler_x_origin
+        LDA reg_scaler_x_origin + 1
         ADC #&00
-        STA scaler_x_offset + 1
+        STA reg_scaler_x_origin + 1
         RTS
 }
 
 .pan_down
 {
-        LDA scaler_zoom
+        JSR wait_for_vsync
+        LDA reg_scaler_zoom
         AND #&07
         TAX
-        LDA scaler_y_offset
+        LDA reg_scaler_y_origin
         SEC
         SBC jump_amount, X
-        STA scaler_y_offset
-        LDA scaler_y_offset + 1
+        STA reg_scaler_y_origin
+        LDA reg_scaler_y_origin + 1
         SBC #&00
-        STA scaler_y_offset + 1
+        STA reg_scaler_y_origin + 1
         RTS
 }
 
 .pan_up
 {
-        LDA scaler_zoom
+        JSR wait_for_vsync
+        LDA reg_scaler_zoom
         AND #&07
         TAX
-        LDA scaler_y_offset
+        LDA reg_scaler_y_origin
         CLC
         ADC jump_amount, X
-        STA scaler_y_offset
-        LDA scaler_y_offset + 1
+        STA reg_scaler_y_origin
+        LDA reg_scaler_y_origin + 1
         ADC #&00
-        STA scaler_y_offset + 1
+        STA reg_scaler_y_origin + 1
         RTS
 }
 
 .jump_amount
     EQUB &00    ; zoom off
-    EQUB &10    ; 800x600
-    EQUB &08    ; 400x300
-    EQUB &04    ; 200x150
-    EQUB &02    ; 100x75
+    EQUB &08    ; 800x600
+    EQUB &04    ; 400x300
+    EQUB &02    ; 200x150
+    EQUB &01    ; 100x75
     EQUB &00    ; undefined zoom
     EQUB &00    ; undefined zoom
     EQUB &00    ; undefined zoom
 
 
+
+.reset_scaler
+{
+        ;; Set the default scaler zoom to none
+        LDA #DEFAULT_ZOOM
+        STA reg_scaler_zoom
+
+        ;; Set the default scaler X origin to half the screen width
+        LDA #0
+        STA tmp
+        LDA reg_x_size
+        ASL A
+        ROL tmp
+        ASL A
+        ROL tmp
+        STA reg_scaler_x_origin
+        LDA tmp
+        STA reg_scaler_x_origin + 1
+
+        ;; Set the default scaler Y origin to half the screen height
+        LDA #0
+        STA tmp
+        LDA reg_y_size
+        ASL A
+        ROL tmp
+        ASL A
+        ROL tmp
+        STA reg_scaler_y_origin
+        LDA tmp
+        STA reg_scaler_y_origin + 1
+        RTS
+}
 
 ; A = 0 - Clear to 0
 ; A = 1 - Clear to low density random

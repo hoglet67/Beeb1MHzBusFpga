@@ -1,12 +1,16 @@
-BASE            = &C8
+BASE                = &C8
 
-reg_control     = &FCA0
-reg_status      = &FCA1
-reg_x_size      = &FCA2
-reg_y_size      = &FCA3
-scaler_x_offset = &FCA4
-scaler_y_offset = &FCA6
-scaler_zoom     = &FCA8
+DEFAULT_ZOOM        = 0
+MIN_ZOOM            = 0
+MAX_ZOOM            = 4
+
+reg_control         = &FCA0
+reg_status          = &FCA1
+reg_x_size          = &FCA2
+reg_y_size          = &FCA3
+reg_scaler_x_origin = &FCA4
+reg_scaler_y_origin = &FCA6
+reg_scaler_zoom     = &FCA8
 
 reg_page_lo     = &FCFE
 reg_page_hi     = &FCFF
@@ -56,7 +60,9 @@ pad             = byte      ; workspace, used by quick sort
 num             = tmp       ; workspace, used by quick sort
 fast_flag       = &88       ; workspace, used by rle_reader, rle_utils
 buf_index       = &89       ; workspace, used by rle_reader, rle_utils
-                            ; &8A-&8F currently free
+scaler_x_origin = &8A
+scaler_y_origin = &8C
+                            ; &8E-&8F currently free
 
 MACRO M_INCREMENT zp
         INC zp
