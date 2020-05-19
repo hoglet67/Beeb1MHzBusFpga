@@ -4,6 +4,10 @@ reg_control     = &FCA0
 reg_status      = &FCA1
 reg_x_size      = &FCA2
 reg_y_size      = &FCA3
+scaler_x_offset = &FCA4
+scaler_y_offset = &FCA6
+scaler_zoom     = &FCA8
+
 reg_page_lo     = &FCFE
 reg_page_hi     = &FCFF
 reg_jim         = &FD00

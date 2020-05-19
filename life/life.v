@@ -172,6 +172,29 @@ module life (
    reg [11:0]          rgb0;
    reg [11:0]          rgb1;
 
+   reg [2:0]           scaler_zoom = 0;        // 800x600
+   reg [10:0]          scaler_x_offset = 400;  // 400->1200
+   reg [10:0]          scaler_y_offset = 300;  // 300->900
+
+   reg [17:0]          scaler_rd_addr_x;
+   reg [17:0]          scaler_rd_addr_y;
+   reg [17:0]          scaler_rd_addr;
+   reg [17:0]          scaler_wr_addr;
+   reg [1:0]           scaler_ram[0:262143];
+   reg [8:0]           scaler_line;
+   reg [10:0]          scaler_x_limit;
+   reg [10:0]          scaler_y_limit;
+   reg [3:0]           scaler_inc_x_mask;
+   reg [3:0]           scaler_inc_y_mask;
+   reg                 scaler_wr_rst;
+   reg                 scaler_wr;
+   reg [1:0]           scaler_dout2;
+   reg                 scaler_dout;
+   reg                 scaler_rd_rst_x;
+   reg                 scaler_rd_rst_y;
+   reg                 scaler_rd_inc_x;
+   reg                 scaler_rd_inc_y;
+
    reg [18:0]          life_rd_addr;
    reg [18:0]          life_wr_addr;
    wire [18:0]         life_wr_offset = WR_OFFSET;
@@ -303,12 +326,121 @@ module life (
                                      ((v_counter == 0 || v_counter == V_ACTIVE - 1) && (h_counter < H_ACTIVE))};
    end
 
+
+   // =================================================
+   // Scaler
+   // =================================================
+
+
+   always @(posedge clk_pixel) begin
+
+      // Zoom = 0; window is 1600x1200 pixels (scaler bypassed)
+      // Zoom = 1; window is 800x600 pixels
+      // Zoom = 2; window is 400x300 pixels
+      // Zoom = 3; window is 200x150 pixels
+      // Zoom = 4; window is 100x75 pixels
+
+      // For now, assume software avoids scaler window wrapping
+      case (scaler_zoom)
+        3'b100:
+          begin
+             // For writes
+             scaler_x_limit <= scaler_x_offset + 10'd100;
+             scaler_y_limit <= scaler_y_offset + 10'd75;
+             // For reads
+             scaler_line <= 9'd50;
+             scaler_inc_x_mask <= 4'b1110;
+             scaler_inc_y_mask <= 4'b1111;
+          end
+        3'b011:
+          begin
+             // For writes
+             scaler_x_limit <= scaler_x_offset + 10'd200;
+             scaler_y_limit <= scaler_y_offset + 10'd150;
+             // For reads
+             scaler_line <= 9'd100;
+             scaler_inc_x_mask <= 4'b0110;
+             scaler_inc_y_mask <= 4'b0111;
+          end
+        3'b010:
+          begin
+             // For writes
+             scaler_x_limit <= scaler_x_offset + 10'd400;
+             scaler_y_limit <= scaler_y_offset + 10'd300;
+             // For reads
+             scaler_line <= 9'd200;
+             scaler_inc_x_mask <= 4'b0010;
+             scaler_inc_y_mask <= 4'b0011;
+          end
+        default:
+          begin
+             // For writes
+             scaler_x_limit <= scaler_x_offset + 10'd800;
+             scaler_y_limit <= scaler_y_offset + 10'd600;
+             // For reads
+             scaler_line <= 9'd400;
+             scaler_inc_x_mask <= 4'b0000;
+             scaler_inc_y_mask <= 4'b0001;
+          end
+      endcase
+
+      // When to reset the scaler wr address
+      scaler_wr_rst <= h_counter[10:0] == scaler_x_offset &&
+                       v_counter[10:0] == scaler_y_offset;
+
+      // When to write/increment the scaler wr address
+      scaler_wr <= h_counter[10:0] >= scaler_x_offset && h_counter[10:0] < scaler_x_limit &&
+                   v_counter[10:0] >= scaler_y_offset && v_counter[10:0] < scaler_y_limit;
+
+      // Scaler write address
+      if (scaler_wr_rst)
+        scaler_wr_addr <= 0;
+      else if (scaler_wr)
+        scaler_wr_addr <= scaler_wr_addr + 1'b1;
+
+      // Scaler write
+      if (scaler_wr)
+        scaler_ram[scaler_wr_addr] <= display_dout[7:6];
+
+      // When to reset the scaler rd address
+      scaler_rd_rst_x <= h_counter == H_ACTIVE; // in the horizonal blanking
+      scaler_rd_rst_y <= v_counter == V_ACTIVE; // in the vertical blanking
+
+      // When to increment the scaler rd addess
+      scaler_rd_inc_x <= ((h_counter[3:0] & scaler_inc_x_mask) == scaler_inc_x_mask) && active;
+      scaler_rd_inc_y <= ((v_counter[3:0] & scaler_inc_y_mask) == scaler_inc_y_mask) && h_counter == H_ACTIVE;
+
+      // X component of scaler read address (bit 0 of this selects the one of the pixel pair)
+      if (scaler_rd_rst_x)
+        scaler_rd_addr_x <= 0;
+      else if (scaler_rd_inc_x)
+        scaler_rd_addr_x <= scaler_rd_addr_x + 1'b1;
+
+      // Y component of scaler read address
+      if (scaler_rd_rst_y)
+        scaler_rd_addr_y <= 0;
+      else if (scaler_rd_inc_y)
+        scaler_rd_addr_y <= scaler_rd_addr_y + scaler_line;
+
+      // Scaler read address
+      scaler_rd_addr <= scaler_rd_addr_y + scaler_rd_addr_x[17:1];
+
+      // Scaler read
+      scaler_dout2 <= scaler_ram[scaler_rd_addr];
+
+      // Output of the scaler is a single pixel
+      scaler_dout <= scaler_rd_addr_x[0] ? scaler_dout2[1] : scaler_dout2[0];
+
+   end
+
    // =================================================
    // Pixel Output
    // =================================================
 
+   wire rescale = |scaler_zoom;
+
    always @(negedge clk_pixel) begin
-      if ((!blank) && display_dout[7]) begin
+      if ((!blank) && (rescale ? scaler_dout : display_dout[7])) begin
          rgb1 <= 12'hFFF;
       end else if (border) begin
          if (ctrl_mask)
@@ -318,7 +450,7 @@ module life (
       end else begin
          rgb1 <= 12'h000;
       end
-      if ((!blank) && display_dout[6]) begin
+      if ((!blank) && (rescale ? scaler_dout : display_dout[6])) begin
          rgb0 <= 12'hFFF;
       end else if (border) begin
          if (ctrl_mask)
@@ -578,6 +710,16 @@ module life (
            cpu_addr[15:8] <= bus_data;
          if (!pgfc_n && bus_addr == 8'hA0 && !rnw)
            control <= bus_data;
+         if (!pgfc_n && bus_addr == 8'hA4 && !rnw)
+           scaler_x_offset[7:0] <= bus_data;
+         if (!pgfc_n && bus_addr == 8'hA5 && !rnw)
+           scaler_x_offset[10:8] <= bus_data[2:0];
+         if (!pgfc_n && bus_addr == 8'hA6 && !rnw)
+           scaler_y_offset[7:0] <= bus_data;
+         if (!pgfc_n && bus_addr == 8'hA7 && !rnw)
+           scaler_y_offset[10:8] <= bus_data[2:0];
+         if (!pgfc_n && bus_addr == 8'hA8 && !rnw)
+           scaler_zoom <= bus_data[2:0];
          if (!pgfc_n && bus_addr == 8'hFF && !rnw) begin
             cpu_addr[18:16] <= bus_data[2:0];
             if (bus_data[7:3] == 5'b11001)
@@ -600,16 +742,21 @@ module life (
    end
 
    assign bus_data = (!pgfc_n && bus_addr == 8'hFF && rnw) ? {selected, 4'b0000, cpu_addr[18:16]} :
-                     (!pgfc_n && bus_addr == 8'hFE && rnw) ? cpu_addr[15:8]                       :
-                     (!pgfc_n && bus_addr == 8'hA0 && rnw) ? control                              :
-                     (!pgfc_n && bus_addr == 8'hA1 && rnw) ? status                               :
-                     (!pgfc_n && bus_addr == 8'hA2 && rnw) ? width_div_8                          :
-                     (!pgfc_n && bus_addr == 8'hA3 && rnw) ? height_div_8                         :
-                     (!pgfd_n && selected          && rnw) ? cpu_rd_data                          :
+                     (!pgfc_n && bus_addr == 8'hFE && rnw) ?  cpu_addr[15:8]                       :
+                     (!pgfc_n && bus_addr == 8'hA0 && rnw) ?  control                              :
+                     (!pgfc_n && bus_addr == 8'hA1 && rnw) ?  status                               :
+                     (!pgfc_n && bus_addr == 8'hA2 && rnw) ?  width_div_8                          :
+                     (!pgfc_n && bus_addr == 8'hA3 && rnw) ?  height_div_8                         :
+                     (!pgfc_n && bus_addr == 8'hA4 && rnw) ?  scaler_x_offset[7:0]                 :
+                     (!pgfc_n && bus_addr == 8'hA5 && rnw) ? {5'b0, scaler_x_offset[10:8]}         :
+                     (!pgfc_n && bus_addr == 8'hA6 && rnw) ?  scaler_y_offset[7:0]                 :
+                     (!pgfc_n && bus_addr == 8'hA7 && rnw) ? {5'b0, scaler_y_offset[10:8]}         :
+                     (!pgfc_n && bus_addr == 8'hA8 && rnw) ? {5'b0, scaler_zoom}                   :
+                     (!pgfd_n && selected          && rnw) ?  cpu_rd_data                          :
                      8'hZZ;
 
    assign bus_data_oel = !(
-                           (clke && !pgfc_n && ({bus_addr[7:2], 2'b00}  == 8'hA0 || bus_addr == 8'hFE || bus_addr == 8'hFF)) ||
+                           (clke && !pgfc_n && (bus_addr[7:4] == 4'hA || bus_addr == 8'hFE || bus_addr == 8'hFF)) ||
                            (clke && !pgfd_n && selected));
 
    assign bus_data_dir = rnw;

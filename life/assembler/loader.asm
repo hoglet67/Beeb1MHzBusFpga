@@ -6,6 +6,12 @@ include "constants.asm"
         LDA #'0'
         STA drive
 
+        ;; Set the cursor keys to return &87-&8B
+        LDA #&04
+        LDX #&01
+        LDY #&00
+        JSR OSBYTE
+
         ;; Set function keys to return &80+n
         LDA #&E1
         LDX #&80
@@ -74,19 +80,19 @@ include "constants.asm"
 .not_drive
         CMP #&09
         BNE not_step
-        JSR engine_step
+        JSR mask_toggle
         JMP prompt
 
 .not_step
         CMP #' '
         BNE not_space
-        JSR mask_toggle
+        JSR engine_toggle
         JMP prompt
 
 .not_space
         CMP #&0D
         BNE not_return
-        JSR engine_toggle
+        JSR engine_step
         JMP prompt
 
 .not_return
@@ -96,22 +102,52 @@ include "constants.asm"
         BCS not_fn
         AND #&03
         JSR clear_screen
-        JSR engine_start
         JMP prompt
 
 .not_fn
+        CMP #&87
+        BNE not_zoom
+        JSR zoom_cycle
+        JMP prompt
+
+.not_zoom
+        CMP #&88
+        BNE not_left
+        JSR pan_left
+        JMP prompt
+
+.not_left
+        CMP #&89
+        BNE not_right
+        JSR pan_right
+        JMP prompt
+
+.not_right
+        CMP #&8A
+        BNE not_down
+        JSR pan_down
+        JMP prompt
+
+.not_down
+        CMP #&8B
+        BNE not_up
+        JSR pan_up
+        JMP prompt
+
+.not_up
         CMP #'A'
         BCC prompt
         CMP last_pattern
         BEQ ok
-        BCS prompt
+        BCC ok
+        JMP prompt
+
 .ok
         PHA
         LDA #&00                ; Clear to blank
         JSR clear_screen
         PLA                     ; create initial pattern
         JSR load_pattern
-        JSR engine_start
         JMP prompt
 }
 
@@ -147,6 +183,10 @@ include "constants.asm"
         JSR OSBYTE
         LDA #&E1
         LDX #&01
+        LDY #&00
+        JSR OSBYTE
+        LDA #&04
+        LDX #&00
         LDY #&00
         JSR OSBYTE
         LDA #22
@@ -213,6 +253,91 @@ include "constants.asm"
         STA reg_control
         RTS
 }
+
+.zoom_cycle
+{
+        LDA scaler_zoom
+        CLC
+        ADC #1
+        CMP #&05
+        BCC ok
+        LDA #0
+.ok
+        STA scaler_zoom
+        RTS
+}
+
+.pan_right
+{
+        LDA scaler_zoom
+        AND #&07
+        TAX
+        LDA scaler_x_offset
+        SEC
+        SBC jump_amount, X
+        STA scaler_x_offset
+        LDA scaler_x_offset + 1
+        SBC #&00
+        STA scaler_x_offset + 1
+        RTS
+}
+
+.pan_left
+{
+        LDA scaler_zoom
+        AND #&07
+        TAX
+        LDA scaler_x_offset
+        CLC
+        ADC jump_amount, X
+        STA scaler_x_offset
+        LDA scaler_x_offset + 1
+        ADC #&00
+        STA scaler_x_offset + 1
+        RTS
+}
+
+.pan_down
+{
+        LDA scaler_zoom
+        AND #&07
+        TAX
+        LDA scaler_y_offset
+        SEC
+        SBC jump_amount, X
+        STA scaler_y_offset
+        LDA scaler_y_offset + 1
+        SBC #&00
+        STA scaler_y_offset + 1
+        RTS
+}
+
+.pan_up
+{
+        LDA scaler_zoom
+        AND #&07
+        TAX
+        LDA scaler_y_offset
+        CLC
+        ADC jump_amount, X
+        STA scaler_y_offset
+        LDA scaler_y_offset + 1
+        ADC #&00
+        STA scaler_y_offset + 1
+        RTS
+}
+
+.jump_amount
+    EQUB &00    ; zoom off
+    EQUB &10    ; 800x600
+    EQUB &08    ; 400x300
+    EQUB &04    ; 200x150
+    EQUB &02    ; 100x75
+    EQUB &00    ; undefined zoom
+    EQUB &00    ; undefined zoom
+    EQUB &00    ; undefined zoom
+
+
 
 ; A = 0 - Clear to 0
 ; A = 1 - Clear to low density random
