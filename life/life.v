@@ -88,7 +88,7 @@ module life (
 
    // DCM
    localparam DCM_M         = 3;
-   localparam DCM_D         = 1;
+   localparam DCM_D         = 2;
 
 `endif
 
@@ -108,7 +108,7 @@ module life (
 
    // DCM
    localparam DCM_M         = 13;
-   localparam DCM_D         = 4;
+   localparam DCM_D         = 8;
 
 `endif
 
@@ -128,72 +128,77 @@ module life (
 
    // DCM
    localparam DCM_M         = 4;
-   localparam DCM_D         = 5;
+   localparam DCM_D         = 10;
 
 `endif
 
    // Row width, excluding neighbour cells
-   localparam ROW_WIDTH     = H_ACTIVE - 3;
+   localparam ROW_WIDTH     = H_ACTIVE - 4;
 
    // Write Offset (effectively the pipeline depth, in 8-pixel units
-   localparam WR_OFFSET     = (H_ACTIVE / 8) + 2;
-
+   localparam WR_OFFSET     = (H_ACTIVE / 8) + 4;
 
    // Write Offset when wrapping
    localparam WR_WRAP       = (H_ACTIVE * V_ACTIVE / 8) - WR_OFFSET;
 
-   // Video Pipeline Delay (inc SRAM) in pixel clocks
-   localparam VPD           = 3;
+   // Video Pipeline Delay (inc SRAM) in clk_pixel cycles
+   localparam VPD           = 2;
+
+   // Life Pipeline Delay in pixels (must be >= 8)
+   localparam LPD           = 15;
 
    wire                clk0;
    wire                clk_pixel;
+   wire                clk_pixel_n;
    reg [11:0]          h_counter_next;
    reg [11:0]          h_counter;
    reg [10:0]          v_counter_next;
    reg [10:0]          v_counter;
 
-   reg [3:0]           red;
-   reg [3:0]           green;
-   reg [3:0]           blue;
-   reg [4:0]           active;
+   wire [3:0]          red;
+   wire [3:0]          green;
+   wire [3:0]          blue;
+   reg                 active;
    reg                 hsync;
    reg                 vsync;
    reg                 blank;
    reg                 border;
-   reg [VPD-1:0]       hsync0;
-   reg [VPD-1:0]       vsync0;
+   reg [VPD:0]         hsync0; // +1 delay, to compensate for the DDR registers on RGB
+   reg [VPD:0]         vsync0; // +1 delay, to compensate for the DDR registers on RGB
    reg [VPD-1:0]       blank0;
    reg [VPD-1:0]       border0;
    reg [7:0]           mask;
+   wire [11:0]         rgb;
+   reg [11:0]          rgb0;
+   reg [11:0]          rgb1;
 
-   reg [18:0]          ram_rd_addr;
-   reg [18:0]          ram_wr_addr;
-   wire [18:0]         ram_wr_offset = WR_OFFSET;
-   wire [18:0]         ram_wr_wrap = WR_WRAP;
-   reg [7:0]           ram_dout;
+   reg [18:0]          life_rd_addr;
+   reg [18:0]          life_wr_addr;
+   wire [18:0]         life_wr_offset = WR_OFFSET;
+   wire [18:0]         life_wr_wrap = WR_WRAP;
+   reg [7:0]           life_dout;
+   reg [7:0]           display_dout;
+
+   reg                 beeb_rd;
+   reg                 write_n;
+
    reg [7:0]           ram_din;
 
-   reg                 n11;
-   reg                 n12;
-   reg                 n13;
-   reg                 n21;
-   reg                 n22;
-   reg                 n23;
-   reg                 n31;
-   reg                 n32;
-   reg                 n33;
+   reg                 n11, n12, n13, n14;
+   reg                 n21, n22, n23, n24;
+   reg                 n31, n32, n33, n34;
+
+   reg                 n22_last;
+   reg                 n23_last;
 
    reg                 running;
 
-   reg [3:0]           neighbour_count;
+   reg [3:0]           neighbour_count1;
+   reg [3:0]           neighbour_count0;
    reg [ROW_WIDTH-1:0] row1;
    reg [ROW_WIDTH-1:0] row2;
-   reg                 nextgen;
-   reg                 nextgen1;
-   reg                 nextgen2;
-   reg                 nextgen3;
-   reg                 nextgen4;
-   reg [7:0]           nextgen8;
+   reg [1:0]           nextgen;
+   reg [LPD-1:0]       nextgen8;
 
    reg                 selected;
    reg [18:0]          cpu_addr;
@@ -222,6 +227,8 @@ module life (
    reg [30:0]          prbs1 = 31'h49987ffe;
    reg [30:0]          prbs2 = 31'h2fe457aa;
 
+   genvar              i;
+
    // =================================================
    // Clock Generation
    // =================================================
@@ -247,7 +254,7 @@ module life (
       .PSEN             (1'b0),
       .PSCLK            (1'b0),
       .CLKFX            (clk_pixel),
-      .CLKFX180         (),
+      .CLKFX180         (clk_pixel_n),
       .CLKDV            (),
       .CLK2X            (),
       .CLK2X180         (),
@@ -265,7 +272,7 @@ module life (
    // =================================================
 
    always @(h_counter or v_counter) begin
-      if (h_counter == H_TOTAL - 1) begin
+      if (h_counter == H_TOTAL - 2) begin
          h_counter_next = 0;
          if (v_counter == V_TOTAL - 1)
            v_counter_next = 0;
@@ -273,24 +280,26 @@ module life (
            v_counter_next = v_counter + 1'b1;
       end else begin
          v_counter_next = v_counter;
-         h_counter_next = h_counter + 1'b1;
+         // Step the h_counter in units of two pixels
+         // (this means the LSB is not used, and will likely generate a warning)
+         h_counter_next = h_counter + 2'b10;
       end
    end
+
 
    always @(posedge clk_pixel) begin
       h_counter <= h_counter_next;
       v_counter <= v_counter_next;
 
-      // Active[0] is aligned with h_counter/v_counter
-      // Active[4] is used by the life engine
-      active    <= {active[3:0], (h_counter_next < H_ACTIVE && v_counter_next < V_ACTIVE)};
+      // Active lags h_counter by one cycle
+      active    <= h_counter_next < H_ACTIVE && v_counter_next < V_ACTIVE;
 
       // Skew the video control outputs by VPD clocks to compensate for the video pipeline delay
       // (the other way of doing this would be with pipeline registers)
       { hsync,  hsync0} <= {hsync0, (h_counter >= H_SYNC_START && h_counter < H_SYNC_END)};
       { vsync,  vsync0} <= {vsync0, (v_counter >= V_SYNC_START && v_counter < V_SYNC_END)};
       { blank,  blank0} <= {blank0, (h_counter >= H_ACTIVE || v_counter >= V_ACTIVE)};
-      {border, border0} <= {border0, ((h_counter == 0 || h_counter == H_ACTIVE - 1) && (v_counter < V_ACTIVE)) ||
+      {border, border0} <= {border0, ((h_counter == 0 || h_counter == H_ACTIVE - 2) && (v_counter < V_ACTIVE)) ||
                                      ((v_counter == 0 || v_counter == V_ACTIVE - 1) && (h_counter < H_ACTIVE))};
    end
 
@@ -298,52 +307,87 @@ module life (
    // Pixel Output
    // =================================================
 
-   always @(posedge clk_pixel) begin
-      if ((!blank) && ram_dout[7]) begin
-         red   <= 4'hF;
-         green <= 4'hF;
-         blue  <= 4'hF;
+   always @(negedge clk_pixel) begin
+      if ((!blank) && display_dout[7]) begin
+         rgb1 <= 12'hFFF;
       end else if (border) begin
-         red   <= ctrl_mask ? 4'hF : 4'h0;
-         green <= ctrl_mask ? 4'h0 : 4'hF;
-         blue  <= 4'h0;
+         if (ctrl_mask)
+           rgb1 <= 12'hF00;
+         else
+           rgb1 <= 12'h0F0;
       end else begin
-         red   <= 4'h0;
-         green <= 4'h0;
-         blue  <= 4'h0;
+         rgb1 <= 12'h000;
+      end
+      if ((!blank) && display_dout[6]) begin
+         rgb0 <= 12'hFFF;
+      end else if (border) begin
+         if (ctrl_mask)
+           rgb0 <= 12'hF00;
+         else
+           rgb0 <= 12'h0F0;
+      end else begin
+         rgb0 <= 12'h000;
       end
    end
+
+   // Use ODDR2 registers to output pixels at 2x clk_pixel
+   generate
+      for (i = 0; i < 12; i = i + 1) begin : b_rgb
+        ODDR2 oddr2_rgb (
+                   .Q  (rgb[i]),
+                   .C0 (clk_pixel_n),
+                   .C1 (clk_pixel),
+                   .CE (1'b1),
+                   .D0 (rgb0[i]),
+                   .D1 (rgb1[i]),
+                   .R  (1'b0),
+                   .S  (1'b0)
+                );
+      end
+   endgenerate
+
+   assign red   = rgb[11:8];
+   assign green = rgb[ 7:4];
+   assign blue  = rgb[ 3:0];
 
    // =================================================
    // Life
    // =================================================
 
    always @(posedge clk_pixel) begin
-      if (active[4]) begin
-         n33 <= ram_dout[7];
-         n32 <= n33;
-         n31 <= n32;
-         row2 <= {row2[ROW_WIDTH-2:0], n31};
-         n23 <= row2[ROW_WIDTH-1];
-         n22 <= n23;
-         n21 <= n22;
-         row1 <= {row1[ROW_WIDTH-2:0], n21};
-         n13 <= row1[ROW_WIDTH-1];
-         n12 <= n13;
-         n11 <= n12;
-         neighbour_count <= n11 + n12 + n13 +
-                            n21       + n23 +
-                            n31 + n32 + n33;
-         // Using n21 here as neighbour_count is pipelined
-         nextgen <= (neighbour_count == 3) || (n21 && (neighbour_count == 2));
 
-         // Add registers to make pipeline a multiple of 8 pixels deep
-         nextgen1 <= nextgen;
-         nextgen2 <= nextgen1;
-         nextgen3 <= nextgen2;
-         nextgen4 <= nextgen3;
-         // Accumulate 8 samples
-         nextgen8 <= {nextgen8[6:0], nextgen4};
+      if (active) begin
+         n34 <= life_dout[6];
+         n33 <= life_dout[7];
+         n32 <= n34;
+         n31 <= n33;
+         row2 <= {row2[ROW_WIDTH-3:0], n31, n32};
+         n24 <= row2[ROW_WIDTH-2];
+         n23 <= row2[ROW_WIDTH-1];
+         n22 <= n24;
+         n21 <= n23;
+         row1 <= {row1[ROW_WIDTH-3:0], n21, n22};
+         n14 <= row1[ROW_WIDTH-2];
+         n13 <= row1[ROW_WIDTH-1];
+         n12 <= n14;
+         n11 <= n13;
+         neighbour_count1 <= n11 + n12 + n13 +
+                             n21       + n23 +
+                             n31 + n32 + n33;
+         neighbour_count0 <= n12 + n13 + n14 +
+                             n22       + n24 +
+                             n32 + n33 + n34;
+         n22_last <= n22;
+         n23_last <= n23;
+
+         // Using n22_last here as neighbour_count1 is pipelined
+         nextgen[1] <= (neighbour_count1 == 3) || (n22_last && (neighbour_count1 == 2));
+
+         // Using n23_last here as neighbour_count0 is pipelined
+         nextgen[0] <= (neighbour_count0 == 3) || (n23_last && (neighbour_count0 == 2));
+
+         // Accumulate 8 pixels, and delay to a multiple of 8 pixels
+         nextgen8 <= {nextgen8[LPD-3:0], nextgen};
       end
    end
 
@@ -354,98 +398,152 @@ module life (
    always @(posedge clk_pixel) begin
 
       // Synchronize the RD/WR Pending signals from the 1MHz Domain
-      if (h_counter[1:0] == 3) begin
+      if (h_counter[2:1] == 2'b01) begin
          cpu_rd_pending1 <= cpu_rd_pending;
          cpu_wr_pending1 <= cpu_wr_pending;
       end
 
-      if (h_counter == 0 && v_counter == 0) begin
-         ram_rd_addr <= 0;
+      // Update RAM Read Address
+      if (h_counter == H_TOTAL - 2 && v_counter == V_TOTAL - 1) begin
+         life_rd_addr <= 0;
          running <= ctrl_running;
-      end else if (active[0] && h_counter[2:0] == 7) begin
-         ram_rd_addr <= ram_rd_addr + 1'b1;
+      end else if (active && h_counter[2:1] == 2'b00) begin
+         life_rd_addr <= life_rd_addr + 1'b1;
       end
 
-      if (ram_rd_addr < WR_OFFSET)
-        ram_wr_addr <= ram_rd_addr + ram_wr_wrap;
+      // Update RAM Write Address to an offset from the read address
+      if (life_rd_addr < WR_OFFSET)
+        life_wr_addr <= life_rd_addr + life_wr_wrap;
       else
-        ram_wr_addr <= ram_rd_addr - ram_wr_offset;
+        life_wr_addr <= life_rd_addr - life_wr_offset;
 
-      ram_dout <= {ram_dout[6:0], 1'b0};
+      // --------------------------------------------------
+      // Memory Cycle 1
+      //     h_counter == 2'b00 and 2'b01
+      //
+      // used for:
+      //     life (i.e. display) reads
+      // --------------------------------------------------
 
-      if (active[0] && !h_counter[2]) begin
-         // Life Engine Read Cycle
-         ram_cel <= 1'b0;
-         ram_addr <= ram_rd_addr;
-         ram_oel <= 1'b0;
-         if (h_counter[1:0] == 3)
-           ram_dout <= ram_data;
+      if (h_counter[2:1] == 2'b00) begin
+         if (active) begin
+            // Start Life Engine Read Cycle
+            ram_cel  <= 1'b0;
+            ram_oel  <= 1'b0;
+            write_n  <= 1'b1;
+            ram_addr <= life_rd_addr;
+         end else begin
+            // Idle Cycle
+            ram_cel  <= 1'b1;
+            ram_oel  <= 1'b1;
+            write_n  <= 1'b1;
+            ram_addr <= 19'h7FFFF;
+         end
+      end
 
-         // Compute the mask for the next write cycle (to prevent wrapping)
-         //  (v_counter is 1 line ahead of the write address)
-         //  (h_counter is 2 bytes ahead of the write address)
+      if (active) begin
+         if (h_counter[2:1] == 2'b10) begin
+            // Capture Data from Life Read Cycle for life engine (during active part of line active)
+            life_dout <= ram_data;
+         end else begin
+            // Shift two pixels (during active part of line active)
+            life_dout <= {life_dout[5:0], 2'b0};
+         end
+      end
+
+      if (h_counter[2:1] == 2'b10) begin
+         // Capture Data from Life Read Cycle for display
+         display_dout <= ram_data;
+      end else begin
+         // Shift two pixels regardless, this avoids right column display artifacts
+         display_dout <= {display_dout[5:0], 2'b0};
+      end
+
+      // Compute the mask for the next write cycle (to prevent wrapping)
+      //  (v_counter is 1 line ahead of the write address)
+      //  (h_counter is 2 bytes ahead of the write address)
+      if (h_counter[2:1] == 2'b01) begin
          if (ctrl_mask && v_counter == 1)
            // Top
            mask <= 8'h00;
          else if (ctrl_mask && v_counter == 0)
            // Bottom
            mask <= 8'h00;
-         else if (ctrl_mask && h_counter[11:3] == 2)
+         else if (ctrl_mask && h_counter[11:3] == 3)
            // Left
            mask <= 8'h7f;
-         else if (ctrl_mask && h_counter[11:3] == 1)
+         else if (ctrl_mask && h_counter[11:3] == 2)
            // Right
            mask <= 8'hfe;
          else
            // No masking
            mask <= 8'hff;
-
-      end else if (active[0] && h_counter[2] && running) begin
-         // Life Engine Write Cyle
-         ram_cel <= 1'b0;
-         ram_oel <= 1'b1;
-         ram_addr <= ram_wr_addr;
-         if (h_counter[1:0] == 0)
-           if (ctrl_clear)
-             ram_din <= clear_wr_data;
-           else
-             ram_din <= nextgen8 & mask;
-         if (h_counter[1:0] == 1 || h_counter[1:0] == 2)
-           ram_wel <= 1'b0;
-         else
-           ram_wel <= 1'b1;
-      end else if (h_counter[2] && !running && cpu_rd_pending2 != cpu_rd_pending1) begin
-         // Beeb Read Cyle
-         ram_cel <= 1'b0;
-         ram_addr <= cpu_addr;
-         ram_oel <= 1'b0;
-         if (h_counter[1:0] == 3) begin
-           cpu_rd_data <= ram_data;
-           cpu_rd_pending2 <= cpu_rd_pending1;
-         end
-      end else if (h_counter[2] && !running && cpu_wr_pending2 != cpu_wr_pending1) begin
-         // Beeb Write Cyle
-         ram_cel <= 1'b0;
-         ram_oel <= 1'b1;
-         ram_addr <= cpu_addr;
-         if (h_counter[1:0] == 0)
-           ram_din <= cpu_wr_data;
-         if (h_counter[1:0] == 1 || h_counter[1:0] == 2)
-           ram_wel <= 1'b0;
-         else
-           ram_wel <= 1'b1;
-         if (h_counter[1:0] == 3)
-           cpu_wr_pending2 <= cpu_wr_pending1;
-      end else begin
-         ram_cel <= 1'b1;
-         ram_oel <= 1'b1;
-         ram_wel <= 1'b1;
-         ram_addr <= 19'h7FFFF;
       end
+
+      // --------------------------------------------------
+      // Memory Cycle 2
+      //     h_counter == 2'b10 and 2'b11
+      //
+      // used for:
+      //     life writes (highest priority)
+      //     beeb reads
+      //     beeb writes (lowest priority)
+      // --------------------------------------------------
+
+      if (h_counter[2:1] == 2'b10) begin
+         beeb_rd <= 1'b0;
+         if (active && running) begin
+            // Start Life Engine Write Cyle
+            ram_cel  <= 1'b0;
+            ram_oel  <= 1'b1;
+            ram_addr <= life_wr_addr;
+            ram_din  <= ctrl_clear ? clear_wr_data : (nextgen8[LPD-1:LPD-8] & mask);
+            write_n  <= 1'b0;
+         end else if (cpu_rd_pending2 != cpu_rd_pending1) begin
+            // Start Beeb Read Cyle
+            ram_cel  <= 1'b0;
+            ram_oel  <= 1'b0;
+            ram_addr <= cpu_addr;
+            write_n  <= 1'b1;
+            cpu_rd_pending2 <= cpu_rd_pending1;
+            beeb_rd  <= 1'b1; // delay reading of beeb data a cycle
+         end else if (cpu_wr_pending2 != cpu_wr_pending1) begin
+            // Start Beeb Write Cyle
+            ram_cel  <= 1'b0;
+            ram_oel  <= 1'b1;
+            ram_addr <= cpu_addr;
+            ram_din  <= cpu_wr_data;
+            write_n  <= 1'b0;
+            cpu_wr_pending2 <= cpu_wr_pending1;
+         end else begin
+            // Idle Cycle
+            ram_cel  <= 1'b1;
+            ram_oel  <= 1'b1;
+            write_n  <= 1'b1;
+            ram_addr <= 19'h7FFFF;
+         end
+      end
+
+      // Capture Data from Beeb Read Cycle
+      if (h_counter[2:1] == 2'b00 && beeb_rd) begin
+         beeb_rd     <= 1'b0;
+         cpu_rd_data <= ram_data;
+      end
+
+      // In all cases, de-assert write in the second half of the write cycle
+      if (h_counter[2:1] == 2'b11) begin
+         write_n <= 1'b1;
+      end
+
    end
 
-   assign ram_data = ram_wel ? 8'hZZ : ram_din;
+   // Actual write strobe is skewed by half a clock, so it is in the middle of the pair of cycles
+   always @(negedge clk_pixel) begin
+      ram_wel = write_n;
+   end
 
+   // Only drive the ram data bus when ram_wel is asserted
+   assign ram_data = ram_wel ? 8'hZZ : ram_din;
 
    // =================================================
    // Data generator for clearing
@@ -462,9 +560,10 @@ module life (
         default:
           clear_wr_data <= 8'h00;
       endcase
-      prbs0 <= {prbs0[29:0], prbs0[27] ^ prbs0[30]};
-      prbs1 <= {prbs1[29:0], prbs1[27] ^ prbs1[30]};
-      prbs2 <= {prbs2[29:0], prbs2[27] ^ prbs2[30]};
+      // Generate two bits at a time
+      prbs0 <= {prbs0[28:0], prbs0[27] ^ prbs0[30], prbs0[26] ^ prbs0[29]};
+      prbs1 <= {prbs1[28:0], prbs1[27] ^ prbs1[30], prbs1[26] ^ prbs1[29]};
+      prbs2 <= {prbs2[28:0], prbs2[27] ^ prbs2[30], prbs2[26] ^ prbs2[29]};
    end
 
    // =================================================
