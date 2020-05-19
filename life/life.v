@@ -194,6 +194,8 @@ module life (
    reg                 scaler_rd_rst_y;
    reg                 scaler_rd_inc_x;
    reg                 scaler_rd_inc_y;
+   reg                 scaler_pix_sel0;
+   reg                 scaler_pix_sel1;
 
    reg [18:0]          life_rd_addr;
    reg [18:0]          life_wr_addr;
@@ -423,13 +425,15 @@ module life (
         scaler_rd_addr_y <= scaler_rd_addr_y + scaler_line;
 
       // Scaler read address
-      scaler_rd_addr <= scaler_rd_addr_y + scaler_rd_addr_x[17:1];
+      scaler_rd_addr  <= scaler_rd_addr_x[17:1] + scaler_rd_addr_y;
+      scaler_pix_sel0 <= scaler_rd_addr_x[0];
 
       // Scaler read
-      scaler_dout2 <= scaler_ram[scaler_rd_addr];
+      scaler_dout2    <= scaler_ram[scaler_rd_addr];
+      scaler_pix_sel1 <= scaler_pix_sel0;
 
       // Output of the scaler is a single pixel
-      scaler_dout <= scaler_rd_addr_x[0] ? scaler_dout2[1] : scaler_dout2[0];
+      scaler_dout <= scaler_pix_sel1 ? scaler_dout2[0] : scaler_dout2[1];
 
    end
 
