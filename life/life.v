@@ -469,12 +469,12 @@ module life (
       endcase
 
       // When to reset the scaler wr address
-      scaler_wr_rst <= h_counter[10:0] == {scaler_x_lo[10:1], 1'b0} &&
-                       v_counter[10:0] == scaler_y_lo;
+      scaler_wr_rst <= h_counter == {1'b0 & scaler_x_lo[10:1], 1'b0} &&
+                       v_counter == scaler_y_lo;
 
       // When to write/increment the scaler wr address
-      scaler_wr <= h_counter[10:0] >= {scaler_x_lo[10:1], 1'b0} && h_counter[10:0] < {scaler_x_hi[10:1], 1'b0} &&
-                   v_counter[10:0] >= scaler_y_lo && v_counter[10:0] < scaler_y_hi;
+      scaler_wr <= h_counter >= {scaler_x_lo[10:1], 1'b0} && h_counter < {1'b0, scaler_x_hi[10:1], 1'b0} &&
+                   v_counter >= scaler_y_lo && v_counter < scaler_y_hi;
 
       // Scaler write address
       if (scaler_wr_rst)
