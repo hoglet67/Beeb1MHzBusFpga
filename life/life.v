@@ -205,6 +205,8 @@ module life (
 
    // Scaler write pipeline
    reg                 active0;
+   reg                 active1;
+   reg                 active2;
    reg [8:0]           scaler_x_count0;
    reg [9:0]           scaler_y_count0;
    reg                 scaler_rst0;
@@ -464,6 +466,7 @@ module life (
 
       scaler_wr1  <= |scaler_x_count0 && |scaler_y_count0 && active0;
       scaler_rst1 <= scaler_rst0;
+      active1     <= active0;
 
       // *************************************************************************
       // *** Write Pipeline stage 2, uses outputs of stage 1
@@ -471,6 +474,7 @@ module life (
 
       scaler_wr2  <= scaler_wr1;
       scaler_rst2 <= scaler_rst1;
+      active2     <= active1;
 
       // *************************************************************************
       // *** Write Pipeline stage 3, uses outputs of stage 2
@@ -483,7 +487,8 @@ module life (
         scaler_wr_addr3 <= scaler_wr_addr3 + 1'b1;
 
       // Capture 3 pixels
-      scaler_din3 <= {scaler_din3[0], display_dout[7:6]};
+      if (active2)
+        scaler_din3 <= {scaler_din3[0], display_dout[7:6]};
       scaler_wr3  <= scaler_wr2;
 
       // *************************************************************************
