@@ -116,7 +116,7 @@ include "constants.asm"
         JMP prompt
 
 .not_return
-        CMP #&84
+        CMP #&80
         BNE not_f0
         JSR mask_toggle
         JMP prompt
