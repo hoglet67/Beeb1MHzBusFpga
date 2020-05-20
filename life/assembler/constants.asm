@@ -62,9 +62,7 @@ pad             = byte      ; workspace, used by quick sort
 num             = tmp       ; workspace, used by quick sort
 fast_flag       = &88       ; workspace, used by rle_reader, rle_utils
 buf_index       = &89       ; workspace, used by rle_reader, rle_utils
-scaler_x_origin = &8A
-scaler_y_origin = &8C
-                            ; &8E-&8F currently free
+                            ; &8C-&8F currently free
 
 MACRO M_INCREMENT zp
         INC zp

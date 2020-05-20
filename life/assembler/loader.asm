@@ -482,6 +482,10 @@ include "constants.asm"
         ROL tmp + 1
         ASL A
         ROL tmp + 1
+        ASL A           ; Two more for FP rep
+        ROL tmp + 1
+        ASL A
+        ROL tmp + 1
         STA tmp
         ; 16-bit compare agaist limit
         LDA accumulator
@@ -493,10 +497,10 @@ include "constants.asm"
 
 .jump_amount
     EQUB &00    ; zoom off
-    EQUB &08    ; 800x600
-    EQUB &04    ; 400x300
-    EQUB &02    ; 200x150
-    EQUB &01    ; 100x75
+    EQUB &20    ; 800x600
+    EQUB &10    ; 400x300
+    EQUB &08    ; 200x150
+    EQUB &04    ; 100x75
     EQUB &00    ; undefined zoom
     EQUB &00    ; undefined zoom
     EQUB &00    ; undefined zoom
@@ -519,6 +523,10 @@ include "constants.asm"
         ROL tmp
         ASL A
         ROL tmp
+        ASL A      ; Two more for FP rep
+        ROL tmp
+        ASL A
+        ROL tmp
         STA reg_scaler_x_origin
         LDA tmp
         STA reg_scaler_x_origin + 1
@@ -528,6 +536,10 @@ include "constants.asm"
         STA tmp
         LDA reg_y_size
         ASL A
+        ROL tmp
+        ASL A
+        ROL tmp
+        ASL A      ; Two more for FP rep
         ROL tmp
         ASL A
         ROL tmp
