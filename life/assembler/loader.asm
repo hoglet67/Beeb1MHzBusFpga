@@ -300,65 +300,152 @@ include "constants.asm"
 
 .pan_right
 {
-        JSR wait_for_vsync
         LDA reg_scaler_zoom
         AND #&07
         TAX
-        LDA reg_scaler_x_origin
-        SEC
-        SBC jump_amount, X
-        STA reg_scaler_x_origin
-        LDA reg_scaler_x_origin + 1
-        SBC #&00
-        STA reg_scaler_x_origin + 1
-        RTS
+        LDA jump_amount, X
+        LDX #<reg_scaler_x_origin
+        LDY reg_x_size
+        JMP pan_decrement
 }
 
 .pan_left
 {
-        JSR wait_for_vsync
         LDA reg_scaler_zoom
         AND #&07
         TAX
-        LDA reg_scaler_x_origin
-        CLC
-        ADC jump_amount, X
-        STA reg_scaler_x_origin
-        LDA reg_scaler_x_origin + 1
-        ADC #&00
-        STA reg_scaler_x_origin + 1
-        RTS
+        LDA jump_amount, X
+        LDX #<reg_scaler_x_origin
+        LDY reg_x_size
+        JMP pan_increment
 }
 
 .pan_down
 {
-        JSR wait_for_vsync
         LDA reg_scaler_zoom
         AND #&07
         TAX
-        LDA reg_scaler_y_origin
-        SEC
-        SBC jump_amount, X
-        STA reg_scaler_y_origin
-        LDA reg_scaler_y_origin + 1
-        SBC #&00
-        STA reg_scaler_y_origin + 1
-        RTS
+        LDA jump_amount, X
+        LDX #<reg_scaler_y_origin
+        LDY reg_y_size
+        JMP pan_decrement
 }
 
 .pan_up
 {
-        JSR wait_for_vsync
         LDA reg_scaler_zoom
         AND #&07
         TAX
-        LDA reg_scaler_y_origin
+        LDA jump_amount, X
+        LDX #<reg_scaler_y_origin
+        LDY reg_y_size
+        JMP pan_increment
+}
+
+; A is the 8-bit amount to increment by
+; X indicates the register in page &FC00 to update
+; Y indicates the limit div 8
+.pan_increment
+{
+
+        ; tmp = A sign extended to 16 bits
+        STA tmp
+        LDA #0
+        STA tmp + 1
+
+        ; perform a 16-bit addition
         CLC
-        ADC jump_amount, X
-        STA reg_scaler_y_origin
-        LDA reg_scaler_y_origin + 1
-        ADC #&00
-        STA reg_scaler_y_origin + 1
+        LDA &FC00, X
+        ADC tmp
+        STA accumulator
+        LDA &FC01, X
+        ADC tmp + 1
+        STA accumulator + 1
+
+        ; calculate limit in tmp, and compare accumulator against it
+        JSR calc_limit_and_compare
+        BCC less_than_limit
+
+        ; subtract limit to accumlator to wrap around correctly
+        SEC
+        LDA accumulator
+        SBC tmp
+        STA accumulator
+        LDA accumulator + 1
+        SBC tmp + 1
+        STA accumulator + 1
+
+.less_than_limit
+        ; Write registers back
+        JSR wait_for_vsync
+        LDA accumulator
+        STA &FC00, X
+        LDA accumulator + 1
+        STA &FC01, X
+        RTS
+}
+
+; A is the 8-bit amount to decrement by
+; X indicates the register in page &FC00 to update
+; Y indicates the limit div 8
+.pan_decrement
+{
+
+        ; tmp = A sign extended to 16 bits
+        STA tmp
+        LDA #0
+        STA tmp + 1
+
+        ; perform a 16-bit subraction
+        SEC
+        LDA &FC00, X
+        SBC tmp
+        STA accumulator
+        LDA &FC01, X
+        SBC tmp + 1
+        STA accumulator + 1
+
+        ; calculate limit in tmp, and compare accumulator against it
+        JSR calc_limit_and_compare
+        BCC less_than_limit
+
+        ; add limit to accumlator to wrap around correctly
+        CLC
+        LDA accumulator
+        ADC tmp
+        STA accumulator
+        LDA accumulator + 1
+        ADC tmp + 1
+        STA accumulator + 1
+
+.less_than_limit
+        ; Write registers back
+        JSR wait_for_vsync
+        LDA accumulator
+        STA &FC00, X
+        LDA accumulator + 1
+        STA &FC01, X
+        RTS
+}
+
+.calc_limit_and_compare
+{
+        ; calculate limit: tmp = limit_div_8 * 8
+        LDA #0
+        STA tmp+1
+        TYA
+        ASL A
+        ROL tmp + 1
+        ASL A
+        ROL tmp + 1
+        ASL A
+        ROL tmp + 1
+        STA tmp
+        ; 16-bit compare agaist limit
+        LDA accumulator
+        CMP tmp
+        LDA accumulator + 1
+        SBC tmp + 1
         RTS
 }
 
@@ -371,8 +458,6 @@ include "constants.asm"
     EQUB &00    ; undefined zoom
     EQUB &00    ; undefined zoom
     EQUB &00    ; undefined zoom
-
-
 
 .reset_scaler
 {
