@@ -376,7 +376,7 @@ module life (
       // No attempt had been made to control the latency through the scaler
       // so it's possible that the window will be a few pixels out horizonal in absolute accuracy
 
-	  // Example at 1600x1200:
+      // Example at 1600x1200:
       // Zoom = 0; window is 1600x1200 pixels (scaler bypassed)
       // Zoom = 1; window is 800x600 pixels
       // Zoom = 2; window is 400x300 pixels
@@ -456,7 +456,7 @@ module life (
          end else if (|scaler_x_count0) begin
             scaler_x_count0 <= scaler_x_count0 - 1'b1;
          end
-      end // if (active)
+      end
 
       active0 <= active;
 
@@ -482,7 +482,7 @@ module life (
 
       // Scaler write address
       if (scaler_rst2)
-        scaler_wr_addr3 <= 0;
+        scaler_wr_addr3 <= -1; // TODO: If this is 0, there's a 2 cell misalignment at all zoom levels
       else if (scaler_wr2)
         scaler_wr_addr3 <= scaler_wr_addr3 + 1'b1;
 
