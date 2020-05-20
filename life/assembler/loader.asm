@@ -10,13 +10,19 @@ include "constants.asm"
 
         ;; Set the cursor keys to return &87-&8B
         LDA #&04
-        LDX #&01
+        LDX #&02
         LDY #&00
         JSR OSBYTE
 
         ;; Set function keys to return &80+n
         LDA #&E1
         LDX #&80
+        LDY #&00
+        JSR OSBYTE
+
+        ;; Set shift-function keys to return &90+n
+        LDA #&E2
+        LDX #&90
         LDY #&00
         JSR OSBYTE
 
@@ -70,7 +76,7 @@ include "constants.asm"
         JSR OSWRCH
 
         JSR print_string
-        EQUS "Z/X/CURSOR/TAB=pan/zoom, SPACE=stop/start, RETURN=step, COPY=mask edges", 10, 13
+        EQUS "Z/X/CURSOR/TAB/COPY=pan/zoom, SPACE=stop/start, RETURN=step", 10, 13
         NOP
 
 .prompt
@@ -90,9 +96,11 @@ include "constants.asm"
         JMP prompt
 
 .not_tab
-        CMP #&87
+        CMP #&8B
         BNE not_copy
-        JSR mask_toggle
+        LDA #0
+        STA reg_scaler_x_speed
+        STA reg_scaler_y_speed
         JMP prompt
 
 .not_copy
@@ -108,15 +116,21 @@ include "constants.asm"
         JMP prompt
 
 .not_return
-        CMP #&80
-        BCC not_fn
-        CMP #&83+1
-        BCS not_fn
+        CMP #&84
+        BNE not_f0
+        JSR mask_toggle
+        JMP prompt
+
+.not_f0
+        CMP #&81
+        BCC not_f14
+        CMP #&84+1
+        BCS not_f14
         AND #&03
         JSR clear_screen
         JMP prompt
 
-.not_fn
+.not_f14
         CMP #'Z'
         BNE not_z
         JSR zoom_inc
@@ -129,25 +143,53 @@ include "constants.asm"
         JMP prompt
 
 .not_x
-        CMP #&88
+        ;; Shift Left - increase pan X speed
+        CMP #&9C
+        BNE not_shift_left
+        INC reg_scaler_x_speed
+        JMP prompt
+
+.not_shift_left
+        ;; Shift Right - decrease pan X speed
+        CMP #&9D
+        BNE not_shift_right
+        DEC reg_scaler_x_speed
+        JMP prompt
+
+.not_shift_right
+        ;; Shift Down - decrease pan Y speed
+        CMP #&9E
+        BNE not_shift_down
+        DEC reg_scaler_y_speed
+        JMP prompt
+
+.not_shift_down
+        ;; Shift Up - increase pan Y speed
+        CMP #&9F
+        BNE not_shift_up
+        INC reg_scaler_y_speed
+        JMP prompt
+
+.not_shift_up
+        CMP #&8C
         BNE not_left
         JSR pan_left
         JMP prompt
 
 .not_left
-        CMP #&89
+        CMP #&8D
         BNE not_right
         JSR pan_right
         JMP prompt
 
 .not_right
-        CMP #&8A
+        CMP #&8E
         BNE not_down
         JSR pan_down
         JMP prompt
 
 .not_down
-        CMP #&8B
+        CMP #&8F
         BNE not_up
         JSR pan_up
         JMP prompt
@@ -174,7 +216,7 @@ include "constants.asm"
 
         JSR print_string
         EQUB 13
-        EQUS "0-3=select drive, F1-F3=random, A-"
+        EQUS "0-3=select drive, F0=mask edges, F1-F3=random, A-"
         NOP
 
         LDA last_pattern
@@ -348,7 +390,7 @@ include "constants.asm"
 .pan_increment
 {
 
-        ; tmp = A sign extended to 16 bits
+        ; tmp = A, zero-extendeded to 16 bits
         STA tmp
         LDA #0
         STA tmp + 1
@@ -391,7 +433,7 @@ include "constants.asm"
 .pan_decrement
 {
 
-        ; tmp = A sign extended to 16 bits
+        ; tmp = A, zero-extendeded to 16 bits
         STA tmp
         LDA #0
         STA tmp + 1
@@ -464,6 +506,10 @@ include "constants.asm"
         ;; Set the default scaler zoom to none
         LDA #DEFAULT_ZOOM
         STA reg_scaler_zoom
+
+        LDA #0
+        STA reg_scaler_x_speed
+        STA reg_scaler_y_speed
 
         ;; Set the default scaler X origin to half the screen width
         LDA #0

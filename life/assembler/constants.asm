@@ -11,6 +11,8 @@ reg_y_size          = &FCA3
 reg_scaler_x_origin = &FCA4
 reg_scaler_y_origin = &FCA6
 reg_scaler_zoom     = &FCA8
+reg_scaler_x_speed  = &FCA9
+reg_scaler_y_speed  = &FCAA
 
 reg_page_lo     = &FCFE
 reg_page_hi     = &FCFF

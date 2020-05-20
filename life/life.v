@@ -154,6 +154,8 @@ module life (
    reg [11:0]          h_counter;
    reg [10:0]          v_counter_next;
    reg [10:0]          v_counter;
+   reg                 last_vsync1;
+   reg                 last_vsync2;
 
    wire [3:0]          red;
    wire [3:0]          green;
@@ -175,6 +177,11 @@ module life (
    reg [2:0]           scaler_zoom = 0; // no zoom
    reg [10:0]          scaler_x_origin = H_ACTIVE / 2;
    reg [10:0]          scaler_y_origin = V_ACTIVE / 2;
+   reg [7:0]           scaler_x_speed;
+   reg [7:0]           scaler_y_speed;
+
+   wire [10:0]         scaler_x_next;
+   wire [10:0]         scaler_y_next;
 
    reg [17:0]          scaler_rd_addr_x;
    reg [17:0]          scaler_rd_addr_y;
@@ -384,9 +391,11 @@ module life (
           end
       endcase
 
-      // Calculator x,y of top left corner
-      scaler_x_lo_tmp <= scaler_x_origin - scaler_w;
-      scaler_y_lo_tmp <= scaler_y_origin - scaler_h[9:1];
+      // Calculate x,y of top left corner (only allow changes when scaler not running)
+      if (scaler_x_count == 0 && scaler_y_count == 0) begin
+         scaler_x_lo_tmp <= scaler_x_origin - scaler_w;
+         scaler_y_lo_tmp <= scaler_y_origin - scaler_h[9:1];
+      end
 
       // Correct for wrapping
       if (scaler_x_lo_tmp < H_ACTIVE)
@@ -735,6 +744,9 @@ module life (
    // 1MHz Bus Interface
    // =================================================
 
+   assign scaler_x_next = scaler_x_origin + {{3{scaler_x_speed[7]}}, scaler_x_speed};
+   assign scaler_y_next = scaler_y_origin + {{3{scaler_y_speed[7]}}, scaler_y_speed};
+
    always @(negedge clke or negedge rst_n) begin
       if (!rst_n) begin
          selected <= 1'b0;
@@ -753,6 +765,10 @@ module life (
            scaler_y_origin[10:8] <= bus_data[2:0];
          if (!pgfc_n && bus_addr == 8'hA8 && !rnw)
            scaler_zoom <= bus_data[2:0];
+         if (!pgfc_n && bus_addr == 8'hA9 && !rnw)
+           scaler_x_speed <= bus_data;
+         if (!pgfc_n && bus_addr == 8'hAA && !rnw)
+           scaler_y_speed <= bus_data;
          if (!pgfc_n && bus_addr == 8'hFF && !rnw) begin
             cpu_addr[18:16] <= bus_data[2:0];
             if (bus_data[7:3] == 5'b11001)
@@ -763,6 +779,24 @@ module life (
          if (selected && !pgfd_n && !rnw) begin
             cpu_wr_pending <= !cpu_wr_pending;
             cpu_wr_data <= bus_data;
+         end
+         last_vsync1 <= vsync;
+         last_vsync2 <= last_vsync1;
+         if (last_vsync1 && !last_vsync2) begin
+            // Auto-pan scaler_x_origin, correctly wrapping
+            if (scaler_x_next < H_ACTIVE)
+              scaler_x_origin <= scaler_x_next;
+            else if (scaler_x_speed[7])
+              scaler_x_origin <= scaler_x_next + H_ACTIVE;
+            else
+              scaler_x_origin <= scaler_x_next - H_ACTIVE;
+            // Auto-pan scaler_y_origin, correctly wrapping
+            if (scaler_y_next < V_ACTIVE)
+              scaler_y_origin <= scaler_y_next;
+            else if (scaler_y_speed[7])
+              scaler_y_origin <= scaler_y_next + V_ACTIVE;
+            else
+              scaler_y_origin <= scaler_y_next - V_ACTIVE;
          end
       end
    end
@@ -785,6 +819,8 @@ module life (
                      (!pgfc_n && bus_addr == 8'hA6 && rnw) ?  scaler_y_origin[7:0]                 :
                      (!pgfc_n && bus_addr == 8'hA7 && rnw) ? {5'b0, scaler_y_origin[10:8]}         :
                      (!pgfc_n && bus_addr == 8'hA8 && rnw) ? {5'b0, scaler_zoom}                   :
+                     (!pgfc_n && bus_addr == 8'hA9 && rnw) ?  scaler_x_speed                       :
+                     (!pgfc_n && bus_addr == 8'hAA && rnw) ?  scaler_y_speed                       :
                      (!pgfd_n && selected          && rnw) ?  cpu_rd_data                          :
                      8'hZZ;
 
