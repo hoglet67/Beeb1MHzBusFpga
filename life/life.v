@@ -215,6 +215,9 @@ module life (
    reg                 scaler_wr1;
    reg                 scaler_wr2;
    reg                 scaler_wr3;
+   reg [1:0]           scaler_bdr0;
+   reg [1:0]           scaler_bdr1;
+   reg [1:0]           scaler_bdr2;
    reg [2:0]           scaler_din3;
    reg [17:0]          scaler_wr_addr3;
 
@@ -278,6 +281,7 @@ module life (
    wire                ctrl_running     = control[7];
    wire                ctrl_mask        = control[6];
    wire                ctrl_clear       = control[5];
+   wire                ctrl_border      = control[4];
    wire [1:0]          ctrl_clear_type  = control[1:0];
 
    wire [7:0]          status = { running, vsync, 6'b000000};
@@ -468,7 +472,9 @@ module life (
          end
       end
 
-      active0 <= active;
+      scaler_bdr0  <= { ((v_counter == 0) || (v_counter == V_ACTIVE - 1) || (h_counter ==            0)) && ctrl_border,
+                        ((v_counter == 0) || (v_counter == V_ACTIVE - 1) || (h_counter == H_ACTIVE - 2)) && ctrl_border};
+      active0      <= active;
 
       // *************************************************************************
       // *** Write Pipeline stage 1, uses outputs of stage 0
@@ -476,6 +482,7 @@ module life (
 
       scaler_wr1  <= |scaler_x_count0 && |scaler_y_count0 && active0;
       scaler_rst1 <= scaler_rst0;
+      scaler_bdr1 <= scaler_bdr0;
       active1     <= active0;
 
       // *************************************************************************
@@ -484,6 +491,7 @@ module life (
 
       scaler_wr2  <= scaler_wr1;
       scaler_rst2 <= scaler_rst1;
+      scaler_bdr2 <= scaler_bdr1;
       active2     <= active1;
 
       // *************************************************************************
@@ -500,7 +508,7 @@ module life (
 
       // Capture 3 pixels
       if (active2)
-        scaler_din3 <= {scaler_din3[0], display_dout[7:6]};
+        scaler_din3 <= {scaler_din3[0], display_dout[7:6] | scaler_bdr2};
       scaler_wr3  <= scaler_wr2;
 
       // *************************************************************************

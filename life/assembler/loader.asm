@@ -131,6 +131,12 @@ include "constants.asm"
         JMP prompt
 
 .not_f14
+        CMP #&85
+        BNE not_f5
+        JSR border_toggle
+        JMP prompt
+
+.not_f5
         CMP #'Z'
         BNE not_z
         JSR zoom_inc
@@ -311,6 +317,14 @@ include "constants.asm"
 {
         LDA reg_control
         EOR #ctrl_mask
+        STA reg_control
+        RTS
+}
+
+.border_toggle
+{
+        LDA reg_control
+        EOR #ctrl_border
         STA reg_control
         RTS
 }

@@ -21,6 +21,7 @@ reg_jim         = &FD00
 ctrl_running    = &80
 ctrl_mask       = &40
 ctrl_clear      = &20
+ctrl_border     = &10
 
 st_running      = &80
 st_vsync        = &40
