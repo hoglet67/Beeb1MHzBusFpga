@@ -220,6 +220,7 @@ module life (
 
    // Scaler RAM
    reg [1:0]           scaler_ram[0:262143];
+   reg                 scaler_bank;
 
    // Scaler read pipeline
    reg [17:0]          scaler_rd_addr_x;
@@ -439,6 +440,15 @@ module life (
       // *** Write Pipeline stage 0 (only this stage uses h_counter/v_counter and active)
       // *************************************************************************
 
+      // Double buffer bank selection
+      if (h_counter == 0 && v_counter == 0) begin
+        if (scaler_zoom < 3'b010) begin
+          scaler_bank <= 1'b0;
+        end else begin
+          scaler_bank <= !scaler_bank;
+        end
+      end
+
       // When to reset the scaler wr address
       // (i.e. at top left corner of capture window)
       scaler_rst0 <= h_counter == {1'b0 & scaler_x_lo[10:1], 1'b0} && v_counter == scaler_y_lo;
@@ -482,7 +492,9 @@ module life (
 
       // Scaler write address
       if (scaler_rst2)
-        scaler_wr_addr3 <= -1; // TODO: If this is 0, there's a 2 cell misalignment at all zoom levels
+        // TODO: If this is 0, there's a 2 cell misalignment at all zoom levels
+        // (bank is negated as the addr counter about to wrap)
+        scaler_wr_addr3 <= {!scaler_bank, 17'h1FFFF};
       else if (scaler_wr2)
         scaler_wr_addr3 <= scaler_wr_addr3 + 1'b1;
 
@@ -512,8 +524,9 @@ module life (
         scaler_rd_addr_x <= scaler_rd_addr_x + 1'b1;
 
       // Y component of scaler read address
+      // (this happens at the end of the frame, so bank is the bank that has just been written)
       if (scaler_rd_rst_y)
-        scaler_rd_addr_y <= 0;
+        scaler_rd_addr_y <= {scaler_bank, 17'h00000};
       else if (scaler_rd_inc_y)
         scaler_rd_addr_y <= scaler_rd_addr_y + scaler_w;
 
