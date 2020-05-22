@@ -582,11 +582,15 @@ include "constants.asm"
         AND #&FC
         ORA tmp
         ORA #ctrl_clear+ctrl_running
-        JSR wait_for_vsync
         STA reg_control
+.wait1  BIT reg_status
+        BPL wait1
         AND #&FC-ctrl_clear-ctrl_running
         JSR wait_for_vsync
+        JSR wait_for_vsync
         STA reg_control
+.wait2  BIT reg_status
+        BMI wait2
         RTS
 }
 
