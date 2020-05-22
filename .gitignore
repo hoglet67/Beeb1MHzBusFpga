@@ -4,3 +4,6 @@ iseconfig/
 working/
 not_in_git/
 build/
+dump.vcd
+a.out
+life.mem
