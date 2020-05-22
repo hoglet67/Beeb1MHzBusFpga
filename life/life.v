@@ -157,29 +157,29 @@ module life (
    wire                clk0;
    wire                clk_pixel;
    wire                clk_pixel_n;
-   reg [11:0]          h_counter_next;
-   reg [11:0]          h_counter;
-   reg [10:0]          v_counter_next;
-   reg [10:0]          v_counter;
-   reg                 last_vsync1;
-   reg                 last_vsync2;
+   reg [11:0]          h_counter_next = 0;
+   reg [11:0]          h_counter = 0;
+   reg [10:0]          v_counter_next = 0;
+   reg [10:0]          v_counter = 0;
+   reg                 last_vsync1 = 0;
+   reg                 last_vsync2 = 0;
 
    wire [3:0]          red;
    wire [3:0]          green;
    wire [3:0]          blue;
-   reg                 active;
-   reg                 hsync;
-   reg                 vsync;
-   reg                 blank;
-   reg                 border;
-   reg [VPD:0]         hsync0; // +1 delay, to compensate for the DDR registers on RGB
-   reg [VPD:0]         vsync0; // +1 delay, to compensate for the DDR registers on RGB
-   reg [VPD-1:0]       blank0;
-   reg [VPD-1:0]       border0;
-   reg [7:0]           mask;
+   reg                 active = 0;
+   reg                 hsync = 0;
+   reg                 vsync = 0;
+   reg                 blank = 0;
+   reg                 border = 0;
+   reg [VPD:0]         hsync0 = 0; // +1 delay, to compensate for the DDR registers on RGB
+   reg [VPD:0]         vsync0 = 0; // +1 delay, to compensate for the DDR registers on RGB
+   reg [VPD-1:0]       blank0 = 0;
+   reg [VPD-1:0]       border0 = 0;
+   reg [7:0]           mask = 0;
    wire [11:0]         rgb;
-   reg [11:0]          rgb0;
-   reg [11:0]          rgb1;
+   reg [11:0]          rgb0 = 0;
+   reg [11:0]          rgb1 = 0;
 
    reg [2:0]           scaler_zoom = 0; // no zoom
 
@@ -190,92 +190,101 @@ module life (
    wire [10+SFB:0]     scaler_y_next;
 
    // This these are in 6.2 fixed point format
-   reg [7:0]           scaler_x_speed;
-   reg [7:0]           scaler_y_speed;
+   reg [7:0]           scaler_x_speed = 0;
+   reg [7:0]           scaler_y_speed = 0;
 
    // Scaler parameters
-   reg [8:0]           scaler_w;
-   reg [9:0]           scaler_h;
-   reg [10:0]          scaler_x_lo_tmp;
-   reg [10:0]          scaler_y_lo_tmp;
-   reg [10:0]          scaler_x_lo;
-   reg [10:0]          scaler_y_lo;
-   reg [3:0]           scaler_inc_x_mask;
-   reg [3:0]           scaler_inc_y_mask;
+   reg [8:0]           scaler_w = 0;
+   reg [9:0]           scaler_h = 0;
+   reg [10:0]          scaler_x_lo_tmp = 0;
+   reg [10:0]          scaler_y_lo_tmp = 0;
+   reg [10:0]          scaler_x_lo = 0;
+   reg [10:0]          scaler_y_lo = 0;
+   reg [3:0]           scaler_inc_x_mask = 0;
+   reg [3:0]           scaler_inc_y_mask = 0;
 
    // Scaler write pipeline
-   reg                 active0;
-   reg                 active1;
-   reg                 active2;
-   reg [8:0]           scaler_x_count0;
-   reg [9:0]           scaler_y_count0;
-   reg                 scaler_rst0;
-   reg                 scaler_rst1;
-   reg                 scaler_rst2;
-   reg                 scaler_wr1;
-   reg                 scaler_wr2;
-   reg                 scaler_wr3;
-   reg [1:0]           scaler_bdr0;
-   reg [1:0]           scaler_bdr1;
-   reg [1:0]           scaler_bdr2;
-   reg [2:0]           scaler_din3;
-   reg [17:0]          scaler_wr_addr3;
+   reg                 active0 = 0;
+   reg                 active1 = 0;
+   reg                 active2 = 0;
+   reg [8:0]           scaler_x_count0 = 0;
+   reg [9:0]           scaler_y_count0 = 0;
+   reg                 scaler_rst0 = 0;
+   reg                 scaler_rst1 = 0;
+   reg                 scaler_rst2 = 0;
+   reg                 scaler_wr1 = 0;
+   reg                 scaler_wr2 = 0;
+   reg                 scaler_wr3 = 0;
+   reg [1:0]           scaler_bdr0 = 0;
+   reg [1:0]           scaler_bdr1 = 0;
+   reg [1:0]           scaler_bdr2 = 0;
+   reg [2:0]           scaler_din3 = 0;
+   reg [17:0]          scaler_wr_addr3 = 0;
 
    // Scaler RAM
    reg [1:0]           scaler_ram[0:262143];
-   reg                 scaler_bank;
+   reg                 scaler_bank = 0;
 
    // Scaler read pipeline
-   reg [17:0]          scaler_rd_addr_x;
-   reg [17:0]          scaler_rd_addr_y;
-   reg [17:0]          scaler_rd_addr;
-   reg                 scaler_rd_rst_x;
-   reg                 scaler_rd_rst_y;
-   reg                 scaler_rd_inc_x;
-   reg                 scaler_rd_inc_y;
-   reg                 scaler_pix_sel0;
-   reg                 scaler_pix_sel1;
-   reg [1:0]           scaler_dout2;
-   reg                 scaler_dout;
+   reg [17:0]          scaler_rd_addr_x = 0;
+   reg [17:0]          scaler_rd_addr_y = 0;
+   reg [17:0]          scaler_rd_addr = 0;
+   reg                 scaler_rd_rst_x = 0;
+   reg                 scaler_rd_rst_y = 0;
+   reg                 scaler_rd_inc_x = 0;
+   reg                 scaler_rd_inc_y = 0;
+   reg                 scaler_pix_sel0 = 0;
+   reg                 scaler_pix_sel1 = 0;
+   reg [1:0]           scaler_dout2 = 0;
+   reg                 scaler_dout = 0;
 
-   reg [18:0]          life_rd_addr;
-   reg [18:0]          life_wr_addr;
+   reg [18:0]          life_rd_addr = 0;
+   reg [18:0]          life_wr_addr = 0;
    wire [18:0]         life_wr_offset = WR_OFFSET;
    wire [18:0]         life_wr_wrap = WR_WRAP;
-   reg [7:0]           life_dout;
-   reg [7:0]           display_dout;
+   reg [7:0]           life_dout = 0;
+   reg [7:0]           display_dout = 0;
 
-   reg                 beeb_rd;
-   reg                 write_n;
+   reg                 beeb_rd = 0;
+   reg                 write_n = 0;
 
-   reg [7:0]           ram_din;
+   reg [7:0]           ram_din = 0;
 
-   reg                 n11, n12, n13, n14;
-   reg                 n21, n22, n23, n24;
-   reg                 n31, n32, n33, n34;
+   reg                 n11 = 0;
+   reg                 n12 = 0;
+   reg                 n13 = 0;
+   reg                 n14 = 0;
+   reg                 n21 = 0;
+   reg                 n22 = 0;
+   reg                 n23 = 0;
+   reg                 n24 = 0;
+   reg                 n31 = 0;
+   reg                 n32 = 0;
+   reg                 n33 = 0;
+   reg                 n34 = 0;
 
-   reg                 n22_last;
-   reg                 n23_last;
+   reg                 n22_last = 0;
+   reg                 n23_last = 0;
 
-   reg                 running;
+   reg                 running = 0;
 
-   reg [3:0]           neighbour_count1;
-   reg [3:0]           neighbour_count0;
-   reg [ROW_WIDTH-1:0] row1;
-   reg [ROW_WIDTH-1:0] row2;
-   reg [1:0]           nextgen;
-   reg [LPD-1:0]       nextgen8;
+   reg [3:0]           neighbour_count1 = 0;
+   reg [3:0]           neighbour_count0 = 0;
+   reg [ROW_WIDTH-1:0] row1 = 0;
+   reg [ROW_WIDTH-1:0] row2 = 0;
+   reg [1:0]           nextgen = 0;
+   reg [LPD-1:0]       nextgen8 = 0;
 
-   reg                 selected;
-   reg [18:0]          cpu_addr;
-   reg [7:0]           cpu_wr_data;
-   reg                 cpu_wr_pending;
-   reg                 cpu_wr_pending1;
-   reg                 cpu_wr_pending2;
-   reg [7:0]           cpu_rd_data;
-   reg                 cpu_rd_pending;
-   reg                 cpu_rd_pending1;
-   reg                 cpu_rd_pending2;
+   reg                 selected = 0;
+   reg [18:0]          cpu_addr = 0;
+   reg [7:0]           cpu_wr_data = 0;
+   reg                 cpu_wr_pending = 0;
+   reg                 cpu_wr_pending1 = 0;
+   reg                 cpu_wr_pending2 = 0;
+   reg [7:0]           cpu_rd_data = 0;
+   reg                 cpu_rd_pending = 0;
+   reg                 cpu_rd_pending1 = 0;
+   reg                 cpu_rd_pending2 = 0;
    reg [7:0]           control = 8'h80;
 
    wire                ctrl_running     = control[7];
@@ -289,7 +298,7 @@ module life (
    wire [7:0]          width_div_8 = H_ACTIVE / 8;
    wire [7:0]          height_div_8 = V_ACTIVE / 8;
 
-   reg [7:0]           clear_wr_data;
+   reg [7:0]           clear_wr_data = 0;
    reg [30:0]          prbs0 = 31'h12345678; // pick different seeds at random
    reg [30:0]          prbs1 = 31'h49987ffe;
    reg [30:0]          prbs2 = 31'h2fe457aa;
