@@ -464,7 +464,7 @@ module life (
 
       // When to reset the scaler wr address
       // (i.e. at top left corner of capture window)
-      scaler_rst0 <= h_counter == {1'b0 & scaler_x_lo[10:1], 1'b0} && v_counter == scaler_y_lo;
+      scaler_rst0 <= h_counter == {1'b0, scaler_x_lo[10:1], 1'b0} && v_counter == scaler_y_lo;
 
       // When to write/increment the scaler wr address
       // (i.e. whether a pixel falls within the capture window)
@@ -509,9 +509,7 @@ module life (
 
       // Scaler write address
       if (scaler_rst2)
-        // TODO: If this is 0, there's a 2 cell misalignment at all zoom levels
-        // (bank is negated as the addr counter about to wrap)
-        scaler_wr_addr3 <= {!scaler_bank, 17'h1FFFF};
+        scaler_wr_addr3 <= {scaler_bank, 17'h00000};
       else if (scaler_wr2)
         scaler_wr_addr3 <= scaler_wr_addr3 + 1'b1;
 
