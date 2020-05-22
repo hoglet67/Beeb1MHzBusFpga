@@ -311,9 +311,8 @@ include "constants.asm"
 
 .engine_step
 {
-        JSR wait_for_vsync
+        JSR engine_stop
         JSR engine_start
-        JSR wait_for_vsync
         JSR engine_stop
         RTS
 }
