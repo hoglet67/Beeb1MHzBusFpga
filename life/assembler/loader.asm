@@ -154,55 +154,55 @@ include "constants.asm"
         JMP prompt
 
 .not_x
-        ;; Shift Left - increase pan X speed
+        ;; Shift Left - decrease pan X speed
         CMP #&9C
         BNE not_shift_left
-        INC reg_scaler_x_speed
-        JMP prompt
-
-.not_shift_left
-        ;; Shift Right - decrease pan X speed
-        CMP #&9D
-        BNE not_shift_right
         DEC reg_scaler_x_speed
         JMP prompt
 
+.not_shift_left
+        ;; Shift Right - increase pan X speed
+        CMP #&9D
+        BNE not_shift_right
+        INC reg_scaler_x_speed
+        JMP prompt
+
 .not_shift_right
-        ;; Shift Down - decrease pan Y speed
+        ;; Shift Down - increase pan Y speed
         CMP #&9E
         BNE not_shift_down
-        DEC reg_scaler_y_speed
+        INC reg_scaler_y_speed
         JMP prompt
 
 .not_shift_down
-        ;; Shift Up - increase pan Y speed
+        ;; Shift Up - decrease pan Y speed
         CMP #&9F
         BNE not_shift_up
-        INC reg_scaler_y_speed
+        DEC reg_scaler_y_speed
         JMP prompt
 
 .not_shift_up
         CMP #&8C
         BNE not_left
-        JSR pan_left
+        JSR pan_right
         JMP prompt
 
 .not_left
         CMP #&8D
         BNE not_right
-        JSR pan_right
+        JSR pan_left
         JMP prompt
 
 .not_right
         CMP #&8E
         BNE not_down
-        JSR pan_down
+        JSR pan_up
         JMP prompt
 
 .not_down
         CMP #&8F
         BNE not_up
-        JSR pan_up
+        JSR pan_down
         JMP prompt
 
 .not_up
