@@ -613,7 +613,7 @@ module life (
 
    always @(posedge clk_pixel) begin
 
-      if (active) begin
+      if (active && running) begin
          n34 <= life_dout[6];
          n33 <= life_dout[7];
          n32 <= n34;
@@ -661,18 +661,20 @@ module life (
       end
 
       // Update RAM Read Address
-      if (h_counter == H_TOTAL - 2 && v_counter == V_TOTAL - 1) begin
-         life_rd_addr <= 0;
-         running <= ctrl_running;
-      end else if (active && h_counter[2:1] == 2'b00) begin
-         life_rd_addr <= life_rd_addr + 1'b1;
-      end
+      if (h_counter == H_TOTAL - 2 && v_counter == V_TOTAL - 1)
+        life_rd_addr <= 0;
+      else if (active && h_counter[2:1] == 2'b00)
+        life_rd_addr <= life_rd_addr + 1'b1;
 
       // Update RAM Write Address to an offset from the read address
       if (life_rd_addr < WR_OFFSET)
         life_wr_addr <= life_rd_addr + life_wr_wrap;
       else
         life_wr_addr <= life_rd_addr - life_wr_offset;
+
+      // Synchronize running changes with the final write of the playfield
+      if (life_wr_addr == H_ACTIVE * V_ACTIVE / 8 - 1)
+        running <= ctrl_running;
 
       // --------------------------------------------------
       // Memory Cycle 1
