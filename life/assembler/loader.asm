@@ -6,6 +6,11 @@ include "constants.asm"
         LDA #'0'
         STA drive
 
+        ;; Initialize the control defaukts
+        LDA #0
+        STA reg_control
+
+        ;; Disable the scaler
         JSR reset_scaler
 
         ;; Set the cursor keys to return &87-&8B
@@ -76,7 +81,7 @@ include "constants.asm"
         JSR OSWRCH
 
         JSR print_string
-        EQUS "Z/X/CURSOR/TAB/COPY=pan/zoom, SPACE=stop/start, RETURN=step", 10, 13
+        EQUS "0-3=drive, Z/X/CURSOR/TAB/COPY=pan/zoom, SPACE=stop/start, RETURN=step", 10, 13
         NOP
 
 .prompt
@@ -117,20 +122,20 @@ include "constants.asm"
 
 .not_return
         CMP #&80
-        BNE not_f0
-        JSR mask_toggle
-        JMP prompt
-
-.not_f0
-        CMP #&81
-        BCC not_f14
-        CMP #&84+1
-        BCS not_f14
+        BCC not_f03
+        CMP #&83+1
+        BCS not_f03
         AND #&03
         JSR clear_screen
         JMP prompt
 
-.not_f14
+.not_f03
+        CMP #&84
+        BNE not_f4
+        JSR mask_toggle
+        JMP prompt
+
+.not_f4
         CMP #&85
         BNE not_f5
         JSR border_toggle
@@ -207,10 +212,10 @@ include "constants.asm"
         BEQ ok
         BCS notok
 .ok
+        ;; Load pattern to current origin (A = pattern letter); don't clear the screep
         PHA
-        LDA #&00                ; Clear to blank
-        JSR clear_screen
-        PLA                     ; create initial pattern
+        JSR engine_stop
+        PLA
         JSR load_pattern
 .notok
         JMP prompt
@@ -222,7 +227,7 @@ include "constants.asm"
 
         JSR print_string
         EQUB 13
-        EQUS "0-3=select drive, F0=mask edges, F1-F3=random, A-"
+        EQUS "F0=clear, F1-3=random, F4=mask, F5=border, A-"
         NOP
 
         LDA last_pattern

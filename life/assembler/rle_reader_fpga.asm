@@ -12,6 +12,7 @@
         JSR parse_rle_header
         JSR offset_pattern
         JSR init_yy
+        JSR wrap_yy
         JSR init_xx
         JSR zero_count
 .loop
@@ -98,9 +99,55 @@
         LDA yy + 1
         ADC count + 1
         STA yy + 1
+        ;; need to wrap yy at reg_y_size (==1200/8 in 1600x1200 mode)
+        JSR wrap_yy
         JSR init_xx
         JSR zero_count
         JMP continue
+}
+
+.wrap_yy
+{
+        ; Get the FB height in tmp
+        LDA #0
+        STA accumulator + 1
+        LDA reg_y_size
+        ASL A
+        ROL accumulator + 1
+        ASL A
+        ROL accumulator + 1
+        ASL A
+        ROL accumulator + 1
+        STA accumulator
+        ; Is it positive?
+        BIT yy + 1
+        BPL positive
+        ; Correct by adding FB height to yy
+        LDA yy
+        CLC
+        ADC accumulator
+        STA yy
+        LDA yy + 1
+        ADC accumulator + 1
+        STA yy + 1
+        RTS
+.positive
+        ; Compare YY with FB Height
+        LDA yy
+        CMP accumulator
+        LDA yy + 1
+        SBC accumulator + 1
+        ; If < then nothing to do
+        BCC exit
+        ;; Correct by subtracting FB height from yy
+        LDA yy
+        SBC accumulator
+        STA yy
+        LDA yy + 1
+        SBC accumulator + 1
+        STA yy + 1
+.exit
+        RTS
 }
 
 .init_xx
@@ -146,9 +193,17 @@
         ROR pat_width
         LSR pat_depth + 1
         ROR pat_depth
-        LDA reg_x_size
+
+        ;; x_origin is 11.2 FP format
+        LDA reg_scaler_x_origin
+        STA tmp
+        LDA reg_scaler_x_origin + 1
         LSR A
-        JSR multiply_by_8
+        ROR tmp
+        LSR A
+        ROR tmp
+        STA tmp+1
+
         LDA tmp                 ; on exit pat_width contains the X coord to load the pattern at
         SEC
         SBC pat_width
@@ -156,9 +211,17 @@
         LDA tmp + 1
         SBC pat_width + 1
         STA pat_width + 1
-        LDA reg_y_size
+
+        ;; y_origin is 11.2 FP format
+        LDA reg_scaler_y_origin
+        STA tmp
+        LDA reg_scaler_y_origin + 1
         LSR A
-        JSR multiply_by_8
+        ROR tmp
+        LSR A
+        ROR tmp
+        STA tmp+1
+
         LDA tmp                 ; on exit pat_depth contains the Y coord to load the pattern at
         SEC
         SBC pat_depth
