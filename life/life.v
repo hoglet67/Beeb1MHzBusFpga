@@ -132,41 +132,43 @@ module life (
 
 `endif
 
-   // Row width, excluding neighbour cells
-   localparam ROW_WIDTH     = H_ACTIVE - 4;
+   // Number of rows in life playfield
+   localparam NR            = V_ACTIVE;
 
-   // Write Offset (effectively the pipeline depth, in 8-pixel units
-   localparam WR_OFFSET     = (H_ACTIVE / 8) + 4;
+   // Number of (byte) cols in life playfield
+   localparam NC            = H_ACTIVE / 8;
+
+   // Write Offset, must be a whole number of rows
+   localparam WR_OFFSET     = NC;
 
    // Write Offset when wrapping
-   localparam WR_WRAP       = (H_ACTIVE * V_ACTIVE / 8) - WR_OFFSET;
+   localparam WR_WRAP       = (NC * NR) - NC;
 
    // Video Pipeline Delay (inc SRAM) in clk_pixel cycles
    localparam VPD           = 2;
 
-   // Life Pipeline Delay in pixels (must be >= 8)
-   localparam LPD           = 15;
-
    // Scaler fractional bits
    localparam SFB           = 2;
+
+   // Life Pipeline Delay (in bytes)
+   localparam LPD           = 3;
 
    // Fixed point versions of H_ACTIVE and V_ACTIVE
    localparam H_ACTIVE_FP   = {H_ACTIVE, {SFB{1'b0}}};
    localparam V_ACTIVE_FP   = {V_ACTIVE, {SFB{1'b0}}};
 
+   // Clocks
    wire                clk0;
    wire                clk_pixel;
    wire                clk_pixel_n;
+
+   // Video Timing
    reg [11:0]          h_counter_next = 0;
    reg [11:0]          h_counter = 0;
    reg [10:0]          v_counter_next = 0;
    reg [10:0]          v_counter = 0;
    reg                 last_vsync1 = 0;
    reg                 last_vsync2 = 0;
-
-   wire [3:0]          red;
-   wire [3:0]          green;
-   wire [3:0]          blue;
    reg                 active = 0;
    reg                 hsync = 0;
    reg                 vsync = 0;
@@ -177,21 +179,23 @@ module life (
    reg [VPD-1:0]       blank0 = 0;
    reg [VPD-1:0]       border0 = 0;
    reg [7:0]           mask = 0;
-   wire [11:0]         rgb;
+
+   // RGB
    reg [11:0]          rgb0 = 0;
    reg [11:0]          rgb1 = 0;
+   wire [11:0]         rgb;
+   wire [3:0]          red;
+   wire [3:0]          green;
+   wire [3:0]          blue;
 
-   reg [2:0]           scaler_zoom = 0; // no zoom
-
-   // This these are in 11.2 fixed point format
-   reg [10+SFB:0]      scaler_x_origin = H_ACTIVE_FP / 2;
-   reg [10+SFB:0]      scaler_y_origin = V_ACTIVE_FP / 2;
-   wire [10+SFB:0]     scaler_x_next;
-   wire [10+SFB:0]     scaler_y_next;
-
-   // This these are in 6.2 fixed point format
-   reg [7:0]           scaler_x_speed = 0;
-   reg [7:0]           scaler_y_speed = 0;
+   // Scaler Registers
+   reg [2:0]           scaler_zoom = 0;                    // 0 = fully zoomed out (scaler bypassed)
+   reg [10+SFB:0]      scaler_x_origin = H_ACTIVE_FP / 2;  // 11.2 fixed point
+   reg [10+SFB:0]      scaler_y_origin = V_ACTIVE_FP / 2;  // 11.2 fixed point
+   wire [10+SFB:0]     scaler_x_next;                      // 11.2 fixed point
+   wire [10+SFB:0]     scaler_y_next;                      // 11.2 fixed point
+   reg [7:0]           scaler_x_speed = 0;                 // 6.2 fixed point
+   reg [7:0]           scaler_y_speed = 0;                 // 6.2 fixed point
 
    // Scaler parameters
    reg [8:0]           scaler_w = 0;
@@ -238,43 +242,28 @@ module life (
    reg [1:0]           scaler_dout2 = 0;
    reg                 scaler_dout = 0;
 
-   reg [18:0]          life_rd_addr = 0;
+   // Life Pipeline
+   reg                 life_clken = 0;
+   reg                 life_rd_active = 0;
+   wire [18:0]         life_rd_addr;
+   reg [7:0]           life_rd_data = 0;
+   reg                 life_wr_active = 0;
+   reg [(LPD-1)*19-1:0]life_wr_addr0 = 0;
    reg [18:0]          life_wr_addr = 0;
+   wire [7:0]          life_wr_data;
+   reg [18:0]          life_col_addr = 0;
+   reg [18:0]          life_row_addr = 0;
    wire [18:0]         life_wr_offset = WR_OFFSET;
    wire [18:0]         life_wr_wrap = WR_WRAP;
-   reg [7:0]           life_dout = 0;
    reg [7:0]           display_dout = 0;
-
-   reg                 beeb_rd = 0;
-   reg                 write_n = 0;
-
-   reg [7:0]           ram_din = 0;
-
-   reg                 n11 = 0;
-   reg                 n12 = 0;
-   reg                 n13 = 0;
-   reg                 n14 = 0;
-   reg                 n21 = 0;
-   reg                 n22 = 0;
-   reg                 n23 = 0;
-   reg                 n24 = 0;
-   reg                 n31 = 0;
-   reg                 n32 = 0;
-   reg                 n33 = 0;
-   reg                 n34 = 0;
-
-   reg                 n22_last = 0;
-   reg                 n23_last = 0;
-
    reg                 running = 0;
 
-   reg [3:0]           neighbour_count1 = 0;
-   reg [3:0]           neighbour_count0 = 0;
-   reg [ROW_WIDTH-1:0] row1 = 0;
-   reg [ROW_WIDTH-1:0] row2 = 0;
-   reg [1:0]           nextgen = 0;
-   reg [LPD-1:0]       nextgen8 = 0;
+   // Memory Controller
+   reg                 beeb_rd = 0;
+   reg                 write_n = 0;
+   reg [7:0]           ram_din = 0;
 
+   // 1MHz Bus
    reg                 selected = 0;
    reg [18:0]          cpu_addr = 0;
    reg [7:0]           cpu_wr_data = 0;
@@ -285,7 +274,7 @@ module life (
    reg                 cpu_rd_pending = 0;
    reg                 cpu_rd_pending1 = 0;
    reg                 cpu_rd_pending2 = 0;
-   reg [7:0]           control = 8'h80;
+   reg [7:0]           control = 8'h00;
 
    wire                ctrl_running     = control[7];
    wire                ctrl_mask        = control[6];
@@ -379,9 +368,8 @@ module life (
                                      ((v_counter == 0 || v_counter == V_ACTIVE - 1) && (h_counter < H_ACTIVE))};
    end
 
-
    // =================================================
-   // Scaler
+   // Scaler (TODO: make this a seperate module)
    // =================================================
 
 
@@ -607,45 +595,80 @@ module life (
    assign green = rgb[ 7:4];
    assign blue  = rgb[ 3:0];
 
+
    // =================================================
-   // Life
+   // Life Pipeline
    // =================================================
+
+   life_pipeline #(NC + LPD) lp
+     (.clk       (clk_pixel),
+      .clken     (life_clken),
+      .read_data (life_rd_data),
+      .write_data(life_wr_data));
+
+   // =================================================
+   // Life Address Generation
+   // =================================================
+
+   assign life_rd_addr = life_row_addr + life_col_addr;
 
    always @(posedge clk_pixel) begin
 
-      if (active && running) begin
-         n34 <= life_dout[6];
-         n33 <= life_dout[7];
-         n32 <= n34;
-         n31 <= n33;
-         row2 <= {row2[ROW_WIDTH-3:0], n31, n32};
-         n24 <= row2[ROW_WIDTH-2];
-         n23 <= row2[ROW_WIDTH-1];
-         n22 <= n24;
-         n21 <= n23;
-         row1 <= {row1[ROW_WIDTH-3:0], n21, n22};
-         n14 <= row1[ROW_WIDTH-2];
-         n13 <= row1[ROW_WIDTH-1];
-         n12 <= n14;
-         n11 <= n13;
-         neighbour_count1 <= n11 + n12 + n13 +
-                             n21       + n23 +
-                             n31 + n32 + n33;
-         neighbour_count0 <= n12 + n13 + n14 +
-                             n22       + n24 +
-                             n32 + n33 + n34;
-         n22_last <= n22;
-         n23_last <= n23;
+      // life_rd_addr = 0 (Row0, Col0) needs to coincide with h/v_counter = 0
+      //
+      // Row sequence is NR+2:
+      //    NR-1, 0, 1, 2, ..., NR-1, 0, <idle during vsync>
+      // (i.e. the first and last rows are read twice)
+      // NR = V_ACTIVE
+      //
+      // Col sequence is NC+2:
+      //    NC-1, 0, 1, 2, ..., NC-1, 0, <idle during hsync>
+      // (i.e. the first and last cols are read twice)
+      // NC = H_ACTIVE / 8
+      //
 
-         // Using n22_last here as neighbour_count1 is pipelined
-         nextgen[1] <= (neighbour_count1 == 3) || (n22_last && (neighbour_count1 == 2));
+      // Life reads are active for NC+2 cols and NR+2 rows compared to the video
+      life_rd_active <= (h_counter_next < (NC + 2) * 8) && (v_counter_next < (NR + 2));
 
-         // Using n23_last here as neighbour_count0 is pipelined
-         nextgen[0] <= (neighbour_count0 == 3) || (n23_last && (neighbour_count0 == 2));
+      // Life writes are active for NC cols and NR rows, but skewed by a couple of cycles
+      life_wr_active <= (h_counter_next >= 3 * 8) && (h_counter_next < (NC + 3) * 8) && (v_counter_next < NR);
 
-         // Accumulate 8 pixels, and delay to a multiple of 8 pixels
-         nextgen8 <= {nextgen8[LPD-3:0], nextgen};
+      // Increment on the 11 cycle, so address stable when next memory cycles start
+      if (h_counter[2:1] == 2'b11) begin
+         if (life_rd_active) begin
+            // Generate the column part of the address
+            if (h_counter[11:3] == NC)
+              life_col_addr <= NC - 1;
+            else if (life_col_addr == NC - 1)
+              life_col_addr <= 0;
+            else
+              life_col_addr <= life_col_addr + 1'b1;
+            // Generate the row part of the address
+            if (h_counter[11:3] == NC)
+              if (v_counter == NR)
+                life_row_addr <= (NR - 1) * NC;
+              else if (life_row_addr == (NR - 1) * NC)
+                life_row_addr <= 0;
+              else
+                life_row_addr <= life_row_addr + NC;
+         end
       end
+
+      // Skew life_wr_addr by the byte delay through the life pipeline, plus a whole row
+      if (h_counter[2:1] == 2'b11)
+        if (life_rd_addr < WR_OFFSET)
+          {life_wr_addr, life_wr_addr0} <= {life_wr_addr0, life_rd_addr + life_wr_wrap};
+        else
+          {life_wr_addr, life_wr_addr0} <= {life_wr_addr0, life_rd_addr - life_wr_offset};
+
+
+      // Life pipeline clocked for the overlap of read and write (to flush the
+      life_clken <= (h_counter[2:1] == 2'b10) && (life_rd_active || life_wr_active);
+
+      // Synchronize running changes with the final write of the playfield
+      if (life_wr_addr == NC * NR - 1)
+        running <= ctrl_running;
+
    end
 
    // =================================================
@@ -660,22 +683,6 @@ module life (
          cpu_wr_pending1 <= cpu_wr_pending;
       end
 
-      // Update RAM Read Address
-      if (h_counter == H_TOTAL - 2 && v_counter == V_TOTAL - 1)
-        life_rd_addr <= 0;
-      else if (active && h_counter[2:1] == 2'b00)
-        life_rd_addr <= life_rd_addr + 1'b1;
-
-      // Update RAM Write Address to an offset from the read address
-      if (life_rd_addr < WR_OFFSET)
-        life_wr_addr <= life_rd_addr + life_wr_wrap;
-      else
-        life_wr_addr <= life_rd_addr - life_wr_offset;
-
-      // Synchronize running changes with the final write of the playfield
-      if (life_wr_addr == H_ACTIVE * V_ACTIVE / 8 - 1)
-        running <= ctrl_running;
-
       // --------------------------------------------------
       // Memory Cycle 1
       //     h_counter == 2'b00 and 2'b01
@@ -685,7 +692,7 @@ module life (
       // --------------------------------------------------
 
       if (h_counter[2:1] == 2'b00) begin
-         if (active) begin
+         if (life_rd_active) begin
             // Start Life Engine Read Cycle
             ram_cel  <= 1'b0;
             ram_oel  <= 1'b0;
@@ -700,13 +707,10 @@ module life (
          end
       end
 
-      if (active) begin
+      if (life_rd_active) begin
          if (h_counter[2:1] == 2'b10) begin
             // Capture Data from Life Read Cycle for life engine (during active part of line active)
-            life_dout <= ram_data;
-         end else begin
-            // Shift two pixels (during active part of line active)
-            life_dout <= {life_dout[5:0], 2'b0};
+            life_rd_data <= ram_data;
          end
       end
 
@@ -751,12 +755,12 @@ module life (
 
       if (h_counter[2:1] == 2'b10) begin
          beeb_rd <= 1'b0;
-         if (active && running) begin
+         if (life_wr_active && running) begin
             // Start Life Engine Write Cyle
             ram_cel  <= 1'b0;
             ram_oel  <= 1'b1;
             ram_addr <= life_wr_addr;
-            ram_din  <= ctrl_clear ? clear_wr_data : (nextgen8[LPD-1:LPD-8] & mask);
+            ram_din  <= ctrl_clear ? clear_wr_data : (life_wr_data & mask);
             write_n  <= 1'b0;
          end else if (cpu_rd_pending2 != cpu_rd_pending1) begin
             // Start Beeb Read Cyle
@@ -933,4 +937,110 @@ module life (
    assign dac_sdi      = 1'b1;
    assign dac_ldac_n   = 1'b1;
 
+endmodule
+
+// =================================================
+// Life Pipeline (now byte wide with clock enable)
+// =================================================
+
+module life_pipeline
+  (
+   clk,
+   clken,
+   read_data,
+   write_data
+   );
+
+   input clk;
+   input clken;
+   input [7:0] read_data;
+   output reg [7:0] write_data;
+
+   // N = the number of cycles the pipeline is active for per line
+   //     (the should be NC + 2 + LPD)
+   //
+   parameter    N = 0;
+
+   // D internally is the length of the row delay element
+   // The -3 is because of the 3 bytes in a,b,c
+   localparam   D = (N-3)*8;
+
+   reg [23:0]   a;
+   reg [23:0]   b;
+   reg [16:0]   c;
+   wire [7:0]   d;
+
+   reg [D-1:0]  row1;
+   reg [D-1:0]  row2;
+
+   genvar       i;
+
+   generate
+      for (i = 0; i < 8; i = i + 1) begin : b_cell
+         life_cell c
+               (.top(a[i+9:i+7]),
+                .middle(b[i+9:i+7]),
+                .bottom(c[i+9:i+7]),
+                .result(d[i]));
+         end
+   endgenerate
+
+   always @(posedge clk)
+     if (clken) begin
+        a          <= {a[15:0], read_data};
+        row1       <= {row1[D-9:0], a[23:16]};
+        b          <= {b[15:0], row1[D-1:D-8]};
+        row2       <= {row2[D-9:0], b[23:16]};
+        c          <= {c[8:0], row2[D-1:D-8]};
+        write_data <= d;
+     end
+
+endmodule
+
+module life_cell
+  (
+   top,
+   middle,
+   bottom,
+   result
+   );
+   input [2:0] top;
+   input [2:0] middle;
+   input [2:0] bottom;
+   output result;
+
+   function [2:0] partial_sum;
+      input [3:0] partial;
+      case (partial)
+        // 1-cell
+        4'b0001 : partial_sum = 3'b001;
+        4'b0010 : partial_sum = 3'b001;
+        4'b0100 : partial_sum = 3'b001;
+        4'b1000 : partial_sum = 3'b001;
+        // 2-cells
+        4'b1100 : partial_sum = 3'b010;
+        4'b1001 : partial_sum = 3'b010;
+        4'b0011 : partial_sum = 3'b010;
+        4'b0110 : partial_sum = 3'b010;
+        4'b0101 : partial_sum = 3'b010;
+        4'b1010 : partial_sum = 3'b010;
+        // 3-cells
+        4'b1110 : partial_sum = 3'b011;
+        4'b1101 : partial_sum = 3'b011;
+        4'b1011 : partial_sum = 3'b011;
+        4'b0111 : partial_sum = 3'b011;
+        // 4-cells
+        4'b1111 : partial_sum = 3'b100;
+        // 0 cells
+        default : partial_sum = 3'b000;
+      endcase
+   endfunction
+
+   wire [2:0] p1 = partial_sum({   top, middle[2]});
+   wire [2:0] p2 = partial_sum({bottom, middle[0]});
+   wire [3:0] sum = p1 + p2;
+
+   assign result = (sum == 2) ? middle[1] :
+                   (sum == 3) ? 1'b1      :
+                   1'b0 ;
 endmodule
