@@ -135,14 +135,20 @@ module life (
    // Number of rows in life playfield
    localparam NR            = V_ACTIVE;
 
+   // Total number of rows on the display
+   localparam TR            = V_TOTAL;
+
    // Number of (byte) cols in life playfield
    localparam NC            = H_ACTIVE / 8;
+
+   // Total number of (byte) cols on the display
+   localparam TC            = H_TOTAL / 8;
 
    // Write Offset, must be a whole number of rows
    localparam WR_OFFSET     = NC;
 
    // Write Offset when wrapping
-   localparam WR_WRAP       = (NC * NR) - NC;
+   localparam WR_WRAP       = (NC * NR) - WR_OFFSET;
 
    // Video Pipeline Delay (inc SRAM) in clk_pixel cycles
    localparam VPD           = 2;
@@ -255,8 +261,10 @@ module life (
    reg [18:0]          life_row_addr = 0;
    wire [18:0]         life_wr_offset = WR_OFFSET;
    wire [18:0]         life_wr_wrap = WR_WRAP;
+   reg                 life_pl_active = 0;
    reg [7:0]           display_dout = 0;
    reg                 running = 0;
+   reg                 life_bank = 0;
 
    // Memory Controller
    reg                 beeb_rd = 0;
@@ -600,7 +608,7 @@ module life (
    // Life Pipeline
    // =================================================
 
-   life_pipeline #(NC + LPD) lp
+   life_pipeline #(NC + LPD + 1) lp
      (.clk       (clk_pixel),
       .clken     (life_clken),
       .read_data (life_rd_data),
@@ -617,21 +625,24 @@ module life (
       // life_rd_addr = 0 (Row0, Col0) needs to coincide with h/v_counter = 0
       //
       // Row sequence is NR+2:
-      //    NR-1, 0, 1, 2, ..., NR-1, 0, <idle during vsync>
+      //    0, 1, 2, ..., NR-1, 0, NR-1, <idle during vsync>
       // (i.e. the first and last rows are read twice)
       // NR = V_ACTIVE
       //
       // Col sequence is NC+2:
-      //    NC-1, 0, 1, 2, ..., NC-1, 0, <idle during hsync>
+      //    0, 1, 2, ..., NC-1, 0, NC-1 <idle during hsync>
       // (i.e. the first and last cols are read twice)
       // NC = H_ACTIVE / 8
       //
 
       // Life reads are active for NC+2 cols and NR+2 rows compared to the video
-      life_rd_active <= (h_counter_next < (NC + 2) * 8) && (v_counter_next < (NR + 2));
+      life_rd_active <= (h_counter_next[11:3] < (NC + 1) || h_counter_next[11:3] == TC - 1) && (v_counter_next < (NR + 1) || v_counter_next == TR - 1);
+
+      // Life pipeline active for one col more to flush
+      life_pl_active <= (h_counter_next[11:3] < (NC + 3) || h_counter_next[11:3] == TC - 1) && (v_counter_next < (NR + 1) || v_counter_next == TR - 1);
 
       // Life writes are active for NC cols and NR rows, but skewed by a couple of cycles
-      life_wr_active <= (h_counter_next >= 3 * 8) && (h_counter_next < (NC + 3) * 8) && (v_counter_next < NR);
+      life_wr_active <= (h_counter_next[11:3] >= 3) && (h_counter_next[11:3] < (NC + 3)) && (v_counter_next > 0) && (v_counter_next <= NR);
 
       // Increment on the 11 cycle, so address stable when next memory cycles start
       if (h_counter[2:1] == 2'b11) begin
@@ -661,14 +672,17 @@ module life (
         else
           {life_wr_addr, life_wr_addr0} <= {life_wr_addr0, life_rd_addr - life_wr_offset};
 
+      // Life pipeline clocked for just one cycle out of four
+      life_clken <= (h_counter[2:1] == 2'b10) && life_pl_active;
 
-      // Life pipeline clocked for the overlap of read and write (to flush the
-      life_clken <= (h_counter[2:1] == 2'b10) && (life_rd_active || life_wr_active);
-
-      // Synchronize running changes with the final write of the playfield
-      if (life_wr_addr == NC * NR - 1)
-        running <= ctrl_running;
-
+      // Just after the last row of writes is a safe place to
+      if (h_counter[2:1] == 2'b11 && h_counter[11:3] == NC + LPD && v_counter == NR) begin
+         // Switch to view bank just written, if we are running
+         if (running)
+           life_bank <= !life_bank;
+         // Update running from the register
+         running <= ctrl_running;
+      end
    end
 
    // =================================================
@@ -697,7 +711,7 @@ module life (
             ram_cel  <= 1'b0;
             ram_oel  <= 1'b0;
             write_n  <= 1'b1;
-            ram_addr <= life_rd_addr;
+            ram_addr <= {life_bank, life_rd_addr[17:0]};
          end else begin
             // Idle Cycle
             ram_cel  <= 1'b1;
@@ -759,14 +773,14 @@ module life (
             // Start Life Engine Write Cyle
             ram_cel  <= 1'b0;
             ram_oel  <= 1'b1;
-            ram_addr <= life_wr_addr;
+            ram_addr <= {!life_bank, life_wr_addr[17:0]};
             ram_din  <= ctrl_clear ? clear_wr_data : (life_wr_data & mask);
             write_n  <= 1'b0;
          end else if (cpu_rd_pending2 != cpu_rd_pending1) begin
             // Start Beeb Read Cyle
             ram_cel  <= 1'b0;
             ram_oel  <= 1'b0;
-            ram_addr <= cpu_addr;
+            ram_addr <= {life_bank, cpu_addr[17:0]};
             write_n  <= 1'b1;
             cpu_rd_pending2 <= cpu_rd_pending1;
             beeb_rd  <= 1'b1; // delay reading of beeb data a cycle
@@ -774,7 +788,7 @@ module life (
             // Start Beeb Write Cyle
             ram_cel  <= 1'b0;
             ram_oel  <= 1'b1;
-            ram_addr <= cpu_addr;
+            ram_addr <= {life_bank, cpu_addr[17:0]};
             ram_din  <= cpu_wr_data;
             write_n  <= 1'b0;
             cpu_wr_pending2 <= cpu_wr_pending1;
@@ -957,7 +971,7 @@ module life_pipeline
    output reg [7:0] write_data;
 
    // N = the number of cycles the pipeline is active for per line
-   //     (the should be NC + 2 + LPD)
+   //     (this is currently NC + LPD + 1)
    //
    parameter    N = 0;
 
