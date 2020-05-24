@@ -132,6 +132,9 @@ module life (
 
 `endif
 
+   // Numver of address bits used for playfield pointers
+   localparam ASIZE         = 18;
+
    // Number of rows in life playfield
    localparam NR            = V_ACTIVE;
 
@@ -251,16 +254,16 @@ module life (
    // Life Pipeline
    reg                 life_clken = 0;
    reg                 life_rd_active = 0;
-   wire [18:0]         life_rd_addr;
+   wire [ASIZE-1:0]    life_rd_addr;
    reg [7:0]           life_rd_data = 0;
    reg                 life_wr_active = 0;
-   reg [(LPD-1)*19-1:0]life_wr_addr0 = 0;
-   reg [18:0]          life_wr_addr = 0;
+   reg [(LPD-1)*ASIZE-1:0] life_wr_addr0 = 0;
+   reg [ASIZE-1:0]     life_wr_addr = 0;
    wire [7:0]          life_wr_data;
-   reg [18:0]          life_col_addr = 0;
-   reg [18:0]          life_row_addr = 0;
-   wire [18:0]         life_wr_offset = WR_OFFSET;
-   wire [18:0]         life_wr_wrap = WR_WRAP;
+   reg [ASIZE-1:0]     life_col_addr = 0;
+   reg [ASIZE-1:0]     life_row_addr = 0;
+   wire [ASIZE-1:0]    life_wr_offset = WR_OFFSET;
+   wire [ASIZE-1:0]    life_wr_wrap = WR_WRAP;
    reg                 life_pl_active = 0;
    reg [7:0]           display_dout = 0;
    reg                 running = 0;
@@ -273,7 +276,7 @@ module life (
 
    // 1MHz Bus
    reg                 selected = 0;
-   reg [18:0]          cpu_addr = 0;
+   reg [ASIZE-1:0]     cpu_addr = 0;
    reg [7:0]           cpu_wr_data = 0;
    reg                 cpu_wr_pending = 0;
    reg                 cpu_wr_pending1 = 0;
@@ -711,7 +714,7 @@ module life (
             ram_cel  <= 1'b0;
             ram_oel  <= 1'b0;
             write_n  <= 1'b1;
-            ram_addr <= {life_bank, life_rd_addr[17:0]};
+            ram_addr <= {life_bank, life_rd_addr};
          end else begin
             // Idle Cycle
             ram_cel  <= 1'b1;
@@ -773,14 +776,14 @@ module life (
             // Start Life Engine Write Cyle
             ram_cel  <= 1'b0;
             ram_oel  <= 1'b1;
-            ram_addr <= {!life_bank, life_wr_addr[17:0]};
+            ram_addr <= {!life_bank, life_wr_addr};
             ram_din  <= ctrl_clear ? clear_wr_data : (life_wr_data & mask);
             write_n  <= 1'b0;
          end else if (cpu_rd_pending2 != cpu_rd_pending1) begin
             // Start Beeb Read Cyle
             ram_cel  <= 1'b0;
             ram_oel  <= 1'b0;
-            ram_addr <= {life_bank, cpu_addr[17:0]};
+            ram_addr <= {life_bank, cpu_addr};
             write_n  <= 1'b1;
             cpu_rd_pending2 <= cpu_rd_pending1;
             beeb_rd  <= 1'b1; // delay reading of beeb data a cycle
@@ -788,7 +791,7 @@ module life (
             // Start Beeb Write Cyle
             ram_cel  <= 1'b0;
             ram_oel  <= 1'b1;
-            ram_addr <= {life_bank, cpu_addr[17:0]};
+            ram_addr <= {life_bank, cpu_addr};
             ram_din  <= cpu_wr_data;
             write_n  <= 1'b0;
             cpu_wr_pending2 <= cpu_wr_pending1;
@@ -873,7 +876,7 @@ module life (
          if (!pgfc_n && bus_addr == 8'hAA && !rnw)
            scaler_y_speed <= bus_data;
          if (!pgfc_n && bus_addr == 8'hFF && !rnw) begin
-            cpu_addr[18:16] <= bus_data[2:0];
+            cpu_addr[ASIZE-1:16] <= bus_data[ASIZE-17:0];
             if (bus_data[7:3] == 5'b11001)
               selected <= 1'b1;
             else
@@ -911,7 +914,7 @@ module life (
         cpu_rd_pending <= !cpu_rd_pending;
    end
 
-   assign bus_data = (!pgfc_n && bus_addr == 8'hFF && rnw) ? {selected, 4'b0000, cpu_addr[18:16]}  :
+   assign bus_data = (!pgfc_n && bus_addr == 8'hFF && rnw) ? {selected, {(23-ASIZE){1'b0}}, cpu_addr[ASIZE-1:16]}  :
                      (!pgfc_n && bus_addr == 8'hFE && rnw) ?  cpu_addr[15:8]                       :
                      (!pgfc_n && bus_addr == 8'hA0 && rnw) ?  control                              :
                      (!pgfc_n && bus_addr == 8'hA1 && rnw) ?  status                               :
