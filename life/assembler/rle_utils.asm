@@ -282,7 +282,7 @@
         INY
         CPY #&07
         BEQ found
-        LDA (tmp), Y
+        LDA (filename), Y
         CMP catalog, X
         BEQ loop2
         TXA

@@ -187,10 +187,10 @@
 {
         TAY
         LDA nameptr_lo, Y
-        STA tmp
+        STA filename
         TAX
         LDA nameptr_hi, Y
-        STA tmp + 1
+        STA filename + 1
         TAY
         BIT fast_flag
         BMI fast
@@ -209,11 +209,12 @@
 .not_found_error
 {
         JSR print_string
-        EQUS "Not found: "
+        EQUB 13, 10, "Not found: "
+        NOP
         LDY #&FF
 .loop
         INY
-        LDA (tmp), Y
+        LDA (filename), Y
         JSR OSASCI
         CMP #&0D
         BNE loop
