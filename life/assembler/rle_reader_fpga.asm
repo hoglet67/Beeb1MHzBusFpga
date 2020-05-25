@@ -11,9 +11,11 @@
 {
         JSR parse_rle_header
         JSR offset_pattern
+        JSR calc_fb_limits
         JSR init_yy
         JSR wrap_yy
         JSR init_xx
+        JSR wrap_xx
         JSR zero_count
 .loop
         LDA byte
@@ -63,10 +65,11 @@
 .insert_cells
         JSR default_count
 
+.cells_loop1
         ; Calculate the FB address of xx,yy and set the paging registers appropriately
         JSR set_framebuffer_address
 
-.cells_loop
+.cells_loop2
         LDA count
         ORA count + 1
         BEQ continue
@@ -76,7 +79,18 @@
 
         M_INCREMENT xx
         M_DECREMENT count
-        JMP cells_loop
+
+        ; Ensure X stays within the bounds, as efficiently as possible
+        LDA xx
+        CMP x_limit
+        LDA xx + 1
+        SBC x_limit + 1
+        BCC cells_loop2
+        LDA #0
+        STA xx
+        STA xx + 1
+
+        JMP cells_loop1
 
 .insert_blanks
         JSR default_count
@@ -87,6 +101,7 @@
         LDA xx + 1
         ADC count + 1
         STA xx + 1
+        JSR wrap_xx
         JSR zero_count
         JMP continue
 
@@ -102,51 +117,99 @@
         ;; need to wrap yy at reg_y_size (==1200/8 in 1600x1200 mode)
         JSR wrap_yy
         JSR init_xx
+        JSR wrap_xx
         JSR zero_count
         JMP continue
 }
 
+.wrap_xx
+{
+        ; Is xx <= 0
+        BIT xx + 1
+        ; Yes, then correct
+        BMI add_limit
+        ; Is xx >= FB width
+        LDA xx
+        CMP x_limit
+        LDA xx + 1
+        SBC x_limit + 1
+        ; Yes, the correct
+        BCS sub_limit
+        RTS
+.sub_limit
+        ;; Correct by subtracting FB width from xx
+        LDA xx
+        SBC x_limit
+        STA xx
+        LDA xx + 1
+        SBC x_limit + 1
+        STA xx + 1
+        ;; Loop back in case further correction is needed
+        JMP wrap_xx
+.add_limit
+        ; Correct by adding FB width to xx
+        LDA xx
+        CLC
+        ADC x_limit
+        STA xx
+        LDA xx + 1
+        ADC x_limit + 1
+        STA xx + 1
+        ;; Loop back in case further correction is needed
+        JMP wrap_xx
+}
+
 .wrap_yy
 {
-        ; Get the FB height in tmp
-        LDA #0
-        STA accumulator + 1
-        LDA reg_y_size
-        ASL A
-        ROL accumulator + 1
-        ASL A
-        ROL accumulator + 1
-        ASL A
-        ROL accumulator + 1
-        STA accumulator
-        ; Is it positive?
+        ; Is yy <= 0
         BIT yy + 1
-        BPL positive
+        ; Yes, then correct
+        BMI add_limit
+        ; Is yy >= FB height
+        LDA yy
+        CMP y_limit
+        LDA yy + 1
+        SBC y_limit + 1
+        ; Yes, the correct
+        BCS sub_limit
+        RTS
+.sub_limit
+        ;; Correct by subtracting FB height from yy
+        LDA yy
+        SBC y_limit
+        STA yy
+        LDA yy + 1
+        SBC y_limit + 1
+        STA yy + 1
+        ;; Loop back in case further correction is needed
+        JMP wrap_yy
+.add_limit
         ; Correct by adding FB height to yy
         LDA yy
         CLC
-        ADC accumulator
+        ADC y_limit
         STA yy
         LDA yy + 1
-        ADC accumulator + 1
+        ADC y_limit + 1
         STA yy + 1
-        RTS
-.positive
-        ; Compare YY with FB Height
-        LDA yy
-        CMP accumulator
-        LDA yy + 1
-        SBC accumulator + 1
-        ; If < then nothing to do
-        BCC exit
-        ;; Correct by subtracting FB height from yy
-        LDA yy
-        SBC accumulator
-        STA yy
-        LDA yy + 1
-        SBC accumulator + 1
-        STA yy + 1
-.exit
+        ;; Loop back in case further correction is needed
+        JMP wrap_yy
+}
+
+.calc_fb_limits
+{
+        LDA reg_x_size
+        JSR multiply_by_8
+        LDA tmp
+        STA x_limit
+        LDA tmp + 1
+        STA x_limit +1
+        LDA reg_y_size
+        JSR multiply_by_8
+        LDA tmp
+        STA y_limit
+        LDA tmp + 1
+        STA y_limit +1
         RTS
 }
 

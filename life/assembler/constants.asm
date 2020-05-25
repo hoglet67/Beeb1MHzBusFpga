@@ -64,7 +64,8 @@ num             = tmp       ; workspace, used by quick sort
 fast_flag       = &88       ; workspace, used by rle_reader, rle_utils
 buf_index       = &89       ; workspace, used by rle_reader, rle_utils
 filename        = &8A       ; file name pointer, used by rle_reader, rle_utils and indexer
-                            ; &8C-&8F currently free
+x_limit         = &8C       ; size of X dimension of frame buffer
+y_limit         = &8E       ; size of Y dimension of frame buffer
 
 MACRO M_INCREMENT zp
         INC zp
