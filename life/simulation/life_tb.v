@@ -47,6 +47,33 @@ module life_tb();
       end
    endtask
 
+   task write_fd;
+      input [7:0] addr;
+      input [7:0] data;
+      begin
+         @(negedge clke);
+         #100;
+         bus_addr = addr;
+         bus_data_out = data;
+         rnw = 1'b0;
+         pgfd_n = 1'b0;
+         @(negedge clke);
+         #100;
+         rnw = 1'b1;
+         pgfd_n = 1'b1;
+      end
+   endtask
+
+   task write_ram;
+      input [17:0] addr;
+      input [7:0] data;
+      begin
+         write_reg(8'hFF, 8'hC8 | addr[17:16]);
+         write_reg(8'hFE, addr[15:8]);
+         write_fd(addr[7:0], data);
+      end
+   endtask
+
 life
    DUT
      (
@@ -86,7 +113,6 @@ life
       );
 
    initial begin
-      $dumpvars;
       // Initialize, otherwise it messes up when probing for roms
       for (i = 0; i < 262144; i = i + 1)
         mem[i] = 0;
@@ -112,14 +138,22 @@ life
       // load the memory image
       $readmemh(LIFE_INIT_FILE, mem);
 
-      write_reg(8'hA0, 8'h10);
+      write_ram(200*2+198, 8'hff);
+
       write_reg(8'hA4, 8'hA8);
       write_reg(8'hA5, 8'h19);
       write_reg(8'hA6, 8'hA0);
       write_reg(8'hA7, 8'h00);
       write_reg(8'hA8, 8'h04);  // Zoom mode 4 (window 100x75)
 
-      #200000 ; // 200us, enough for a few video lines
+      write_reg(8'hA0, 8'h90);  // Runnng + Border
+
+      // Wait 15.5ms for first frame to almost complete
+      #(15500 * 1000);
+      $dumpvars;
+
+      // Wait 1.5ms for the next frame to start
+      #(1500 * 1000);
 
       $finish;
 
