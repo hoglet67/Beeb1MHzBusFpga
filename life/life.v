@@ -210,8 +210,10 @@ module life (
    reg [8:0]           scaler_w = 0;
    reg [9:0]           scaler_h = 0;
    reg [10:0]          scaler_x_lo_tmp = 0;
+   reg [10:0]          scaler_x_hi_tmp = 0;
    reg [10:0]          scaler_y_lo_tmp = 0;
    reg [10:0]          scaler_x_lo = 0;
+   reg [10:0]          scaler_x_hi = 0;
    reg [10:0]          scaler_y_lo = 0;
    reg [3:0]           scaler_inc_x_mask = 0;
    reg [3:0]           scaler_inc_y_mask = 0;
@@ -220,11 +222,11 @@ module life (
    reg                 active0 = 0;
    reg                 active1 = 0;
    reg                 active2 = 0;
-   reg [8:0]           scaler_x_count0 = 0;
    reg [9:0]           scaler_y_count0 = 0;
    reg                 scaler_rst0 = 0;
    reg                 scaler_rst1 = 0;
    reg                 scaler_rst2 = 0;
+   reg                 scaler_x_in_range0 = 0;
    reg                 scaler_wr1 = 0;
    reg                 scaler_wr2 = 0;
    reg                 scaler_wr3 = 0;
@@ -236,6 +238,8 @@ module life (
    reg [1:0]           scaler_lr_bdr1 = 0;
    reg [1:0]           scaler_lr_bdr2 = 0;
    reg [2:0]           scaler_din3 = 0;
+   reg [8:0]           scaler_wr_addr_x2 = 0;
+   reg [17:0]          scaler_wr_addr_y2 = 0;
    reg [17:0]          scaler_wr_addr3 = 0;
 
    // Scaler RAM
@@ -436,9 +440,10 @@ module life (
       endcase
 
       // Calculate x,y of top left corner (only allow changes when scaler not running)
-      if (scaler_x_count0 == 0 && scaler_y_count0 == 0) begin
+      if (scaler_y_count0 == 0) begin
          // Ignore the fractional bits
          scaler_x_lo_tmp <= scaler_x_origin[10+SFB:SFB] - scaler_w;
+         scaler_x_hi_tmp <= scaler_x_origin[10+SFB:SFB] + scaler_w;
          scaler_y_lo_tmp <= scaler_y_origin[10+SFB:SFB] - scaler_h[9:1];
       end
 
@@ -447,6 +452,10 @@ module life (
         scaler_x_lo <= scaler_x_lo_tmp;
       else
         scaler_x_lo <= scaler_x_lo_tmp + H_ACTIVE;
+      if (scaler_x_hi_tmp <= H_ACTIVE)
+        scaler_x_hi <= scaler_x_hi_tmp;
+      else
+        scaler_x_hi <= scaler_x_hi_tmp - H_ACTIVE;
       if (scaler_y_lo_tmp < V_ACTIVE)
         scaler_y_lo <= scaler_y_lo_tmp;
       else
@@ -465,36 +474,49 @@ module life (
         end
       end
 
-      // When to reset the scaler wr address
-      // (i.e. at top left corner of capture window)
-      scaler_rst0 <= h_counter == {1'b0, scaler_x_lo[10:1], 1'b0} && v_counter == scaler_y_lo;
-
-      // When to write/increment the scaler wr address
-      // (i.e. whether a pixel falls within the capture window)
+      // When to start capturing
+      scaler_rst0 <= 1'b0;
       if (active) begin
-         if (h_counter == {1'b0, scaler_x_lo[10:1], 1'b0}) begin
-            scaler_x_count0 <= scaler_w;
-            if (v_counter == scaler_y_lo) begin
-               scaler_y_count0 <= scaler_h;
-            end else if (|scaler_y_count0) begin
-               scaler_y_count0 <= scaler_y_count0 - 1'b1;
+         if (scaler_x_lo < scaler_x_hi) begin
+            // The window doesn't cross the L/R boundary
+            if (h_counter == {1'b0, scaler_x_lo[10:1], 1'b0}) begin
+               if (v_counter == scaler_y_lo) begin
+                  scaler_rst0 <= 1'b1;
+                  scaler_y_count0 <= scaler_h;
+               end else if (|scaler_y_count0) begin
+                  scaler_y_count0 <= scaler_y_count0 - 1'b1;
+               end
             end
-            scaler_tb_bdr0 <= (v_counter == 0 || v_counter == V_ACTIVE - 1) && ctrl_border;
-         end else if (|scaler_x_count0) begin
-            scaler_x_count0 <= scaler_x_count0 - 1'b1;
+         end else begin
+            if (h_counter == 0) begin
+               if (v_counter == scaler_y_lo) begin
+                  scaler_rst0 <= 1'b1;
+                  scaler_y_count0 <= scaler_h;
+               end else if (|scaler_y_count0) begin
+                  scaler_y_count0 <= scaler_y_count0 - 1'b1;
+               end
+            end
          end
       end
 
-      scaler_lr_bdr0  <= { ((h_counter ==            0)) && ctrl_border,
-                           ((h_counter == H_ACTIVE - 2)) && ctrl_border};
+      if (scaler_x_lo < scaler_x_hi) begin
+         scaler_x_in_range0 <= (h_counter >= {1'b0, scaler_x_lo[10:1], 1'b0}) && (h_counter < {1'b0, scaler_x_hi[10:1], 1'b0});
+      end else begin
+         scaler_x_in_range0 <= (h_counter >= {1'b0, scaler_x_lo[10:1], 1'b0}) || (h_counter < {1'b0, scaler_x_hi[10:1], 1'b0});
+      end
 
-      active0      <= active;
+      scaler_tb_bdr0 <= (v_counter == 0 || v_counter == V_ACTIVE - 1) && ctrl_border;
+
+      scaler_lr_bdr0 <= { ((h_counter ==            0)) && ctrl_border,
+                          ((h_counter == H_ACTIVE - 2)) && ctrl_border};
+
+      active0        <= active;
 
       // *************************************************************************
       // *** Write Pipeline stage 1, uses outputs of stage 0
       // *************************************************************************
 
-      scaler_wr1     <= |scaler_x_count0 && |scaler_y_count0 && active0;
+      scaler_wr1     <= scaler_x_in_range0 && |scaler_y_count0 && active0;
       scaler_rst1    <= scaler_rst0;
       scaler_lr_bdr1 <= scaler_lr_bdr0;
       scaler_tb_bdr1 <= scaler_tb_bdr0;
@@ -503,6 +525,39 @@ module life (
       // *************************************************************************
       // *** Write Pipeline stage 2, uses outputs of stage 1
       // *************************************************************************
+
+      // Scaler write address
+      if (scaler_x_lo < scaler_x_hi) begin
+         // The window doesn't cross the L/R boundary
+         if (scaler_rst1) begin
+            scaler_wr_addr_x2 <= 0;
+            scaler_wr_addr_y2 <= {scaler_bank, 17'b0};
+         end else if (scaler_wr1) begin
+            if (scaler_wr_addr_x2 == scaler_w - 1'b1) begin
+               scaler_wr_addr_x2 <= 0;
+            end else begin
+               scaler_wr_addr_x2 <= scaler_wr_addr_x2 + 1'b1;
+            end
+            if (scaler_wr_addr_x2 + 1'b1 == scaler_w) begin
+               scaler_wr_addr_y2 <= scaler_wr_addr_y2 + scaler_w;
+            end
+         end
+      end else begin
+         // The window crosses the L/R boundary
+         if (scaler_rst1) begin
+            scaler_wr_addr_x2 <= scaler_w - scaler_x_hi[10:1];
+            scaler_wr_addr_y2 <= {scaler_bank, 17'b0};
+         end else if (scaler_wr1) begin
+            if (scaler_wr_addr_x2 == scaler_w - 1) begin
+               scaler_wr_addr_x2 <= 0;
+            end else begin
+               scaler_wr_addr_x2 <= scaler_wr_addr_x2 + 1'b1;
+            end
+            if (scaler_wr_addr_x2 + 1'b1 == scaler_w - scaler_x_hi[10:1]) begin
+               scaler_wr_addr_y2 <= scaler_wr_addr_y2 + scaler_w;
+            end
+         end
+      end
 
       scaler_wr2     <= scaler_wr1;
       scaler_rst2    <= scaler_rst1;
@@ -514,11 +569,7 @@ module life (
       // *** Write Pipeline stage 3, uses outputs of stage 2
       // *************************************************************************
 
-      // Scaler write address
-      if (scaler_rst2)
-        scaler_wr_addr3 <= {scaler_bank, 17'h00000};
-      else if (scaler_wr2)
-        scaler_wr_addr3 <= scaler_wr_addr3 + 1'b1;
+      scaler_wr_addr3 <= scaler_wr_addr_y2 + scaler_wr_addr_x2;
 
       // Capture 3 pixels
       if (active2)
