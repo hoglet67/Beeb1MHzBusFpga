@@ -147,12 +147,6 @@ module life (
    // Total number of (byte) cols on the display
    localparam TC            = H_TOTAL / 8;
 
-   // Write Offset, must be a whole number of rows
-   localparam WR_OFFSET     = NC;
-
-   // Write Offset when wrapping
-   localparam WR_WRAP       = (NC * NR) - WR_OFFSET;
-
    // Video Pipeline Delay (inc SRAM) in clk_pixel cycles
    localparam VPD           = 2;
 
@@ -263,14 +257,17 @@ module life (
    reg                 life_rd_active = 0;
    wire [ASIZE-1:0]    life_rd_addr;
    reg [7:0]           life_rd_data = 0;
+   wire [7:0]          life_data1;
+   wire [7:0]          life_data2;
+   wire [7:0]          life_data3;
+   wire [ASIZE-1:0]    life_addr1;
+   wire [ASIZE-1:0]    life_addr2;
+   wire [ASIZE-1:0]    life_addr3;
    reg                 life_wr_active = 0;
-   reg [(LPD-1)*ASIZE-1:0] life_wr_addr0 = 0;
-   reg [ASIZE-1:0]     life_wr_addr = 0;
+   wire [ASIZE-1:0]    life_wr_addr;
    wire [7:0]          life_wr_data;
    reg [ASIZE-1:0]     life_col_addr = 0;
    reg [ASIZE-1:0]     life_row_addr = 0;
-   wire [ASIZE-1:0]    life_wr_offset = WR_OFFSET;
-   wire [ASIZE-1:0]    life_wr_wrap = WR_WRAP;
    reg                 life_pl_active = 0;
    reg [7:0]           display_dout = 0;
    reg                 running = 0;
@@ -600,7 +597,7 @@ module life (
       scaler_rd_rst_x <= h_counter == H_ACTIVE;
       scaler_rd_rst_y <= v_counter == V_TOTAL - 1;
 
-      // When to increment the scaler rd addess
+      // When to increment the scaler rd address
       scaler_rd_inc_x <= ((h_counter[3:0] & scaler_inc_x_mask) == scaler_inc_x_mask) && active;
       scaler_rd_inc_y <= ((v_counter[3:0] & scaler_inc_y_mask) == scaler_inc_y_mask) && h_counter == H_ACTIVE;
 
@@ -684,11 +681,37 @@ module life (
    // Life Pipeline
    // =================================================
 
-   life_pipeline #(NC + LPD + 1) lp
+   life_pipeline #(NC + LPD + 10, ASIZE, NC, NR) lp1
      (.clk       (clk_pixel),
       .clken     (life_clken),
       .read_data (life_rd_data),
-      .write_data(life_wr_data));
+      .read_addr (life_rd_addr),
+      .write_data(life_data1),
+      .write_addr(life_addr1));
+
+   life_pipeline #(NC + LPD + 10, ASIZE, NC, NR) lp2
+     (.clk       (clk_pixel),
+      .clken     (life_clken),
+      .read_data (life_data1),
+      .read_addr (life_addr1),
+      .write_data(life_data2),
+      .write_addr(life_addr2));
+
+   life_pipeline #(NC + LPD + 10, ASIZE, NC, NR) lp3
+     (.clk       (clk_pixel),
+      .clken     (life_clken),
+      .read_data (life_data2),
+      .read_addr (life_addr2),
+      .write_data(life_data3),
+      .write_addr(life_addr3));
+
+   life_pipeline #(NC + LPD + 10, ASIZE, NC, NR) lp4
+     (.clk       (clk_pixel),
+      .clken     (life_clken),
+      .read_data (life_data3),
+      .read_addr (life_addr3),
+      .write_data(life_wr_data),
+      .write_addr(life_wr_addr));
 
    // =================================================
    // Life Address Generation
@@ -715,10 +738,10 @@ module life (
       life_rd_active <= (h_counter_next[11:3] < (NC + 1) || h_counter_next[11:3] == TC - 1) && (v_counter_next < (NR + 1) || v_counter_next == TR - 1);
 
       // Life pipeline active for one col more to flush
-      life_pl_active <= (h_counter_next[11:3] < (NC + 3) || h_counter_next[11:3] == TC - 1) && (v_counter_next < (NR + 1) || v_counter_next == TR - 1);
+      life_pl_active <= (h_counter_next[11:3] < (NC + 12) || h_counter_next[11:3] == TC - 1) && (v_counter_next < (NR + 1) || v_counter_next == TR - 1);
 
       // Life writes are active for NC cols and NR rows, but skewed by a couple of cycles
-      life_wr_active <= (h_counter_next[11:3] >= 3) && (h_counter_next[11:3] < (NC + 3)) && (v_counter_next > 0) && (v_counter_next <= NR);
+      life_wr_active <= (h_counter_next[11:3] >= 12) && (h_counter_next[11:3] < (NC + 12)) && (v_counter_next > 0) && (v_counter_next <= NR);
 
       // Increment on the 11 cycle, so address stable when next memory cycles start
       if (h_counter[2:1] == 2'b11) begin
@@ -741,18 +764,12 @@ module life (
          end
       end
 
-      // Skew life_wr_addr by the byte delay through the life pipeline, plus a whole row
-      if (h_counter[2:1] == 2'b11)
-        if (life_rd_addr < WR_OFFSET)
-          {life_wr_addr, life_wr_addr0} <= {life_wr_addr0, life_rd_addr + life_wr_wrap};
-        else
-          {life_wr_addr, life_wr_addr0} <= {life_wr_addr0, life_rd_addr - life_wr_offset};
 
       // Life pipeline clocked for just one cycle out of four
       life_clken <= (h_counter[2:1] == 2'b10) && life_pl_active;
 
       // Just after the last row of writes is a safe place to
-      if (h_counter[2:1] == 2'b11 && h_counter[11:3] == NC + LPD && v_counter == NR) begin
+      if (h_counter[2:1] == 2'b11 && h_counter[11:3] == NC + 4*LPD && v_counter == NR) begin
          // Switch to view bank just written, if we are running
          if (running)
            life_bank <= !life_bank;
@@ -813,8 +830,8 @@ module life (
       end
 
       // Compute the mask for the next write cycle (to prevent wrapping)
-      //  (v_counter is 1 line ahead of the write address)
-      //  (h_counter is 2 bytes ahead of the write address)
+      //  (v_counter is 1 line ahead of the write addr)
+      //  (h_counter is 2 bytes ahead of the write addr)
       if (h_counter[2:1] == 2'b01) begin
          if (ctrl_mask && v_counter == 1)
            // Top
@@ -1038,30 +1055,48 @@ module life_pipeline
    clk,
    clken,
    read_data,
-   write_data
+   read_addr,
+   write_data,
+   write_addr
    );
 
    input clk;
    input clken;
    input [7:0] read_data;
-   output reg [7:0] write_data;
+   input [ASIZE-1:0] read_addr;
+   output reg [7:0] write_data = 0;
+   output reg [ASIZE-1:0] write_addr = 0;
 
    // N = the number of cycles the pipeline is active for per line
    //     (this is currently NC + LPD + 1)
    //
-   parameter    N = 0;
+   parameter N = 0;
+   parameter ASIZE = 0;
+   parameter NC = 0;
+   parameter NR = 0;
 
-   // D internally is the length of the row delay element
+   // D internally is the lngth of the row delay element
    // The -3 is because of the 3 bytes in a,b,c
    localparam   D = (N-3)*8;
 
-   reg [23:0]   a;
-   reg [23:0]   b;
-   reg [16:0]   c;
+   // Write Offset, must be a whole number of rows
+   localparam WR_OFFSET     = NC;
+
+   // Write Offset when wrapping
+   localparam WR_WRAP       = (NC * NR) - WR_OFFSET;
+
+   reg [23:0]   a = 0;
+   reg [23:0]   b = 0;
+   reg [16:0]   c = 0;
    wire [7:0]   d;
 
-   reg [D-1:0]  row1;
-   reg [D-1:0]  row2;
+   reg [D-1:0]  row1 = 0;
+   reg [D-1:0]  row2 = 0;
+
+   reg [ASIZE-1:0] addr1 = 0;
+   reg [ASIZE-1:0] addr2 = 0;
+   wire [ASIZE-1:0]    life_wr_offset = WR_OFFSET;
+   wire [ASIZE-1:0]    life_wr_wrap = WR_WRAP;
 
    genvar       i;
 
@@ -1083,6 +1118,12 @@ module life_pipeline
         row2       <= {row2[D-9:0], b[23:16]};
         c          <= {c[8:0], row2[D-1:D-8]};
         write_data <= d;
+        addr1      <= read_addr;
+        addr2      <= addr1;
+        if (addr2 < WR_OFFSET)
+          write_addr <= addr2 + life_wr_wrap;
+        else
+          write_addr <= addr2 - life_wr_offset;
      end
 
 endmodule
