@@ -527,7 +527,7 @@ module life (
             scaler_wr_addr_x2 <= 0;
             scaler_wr_addr_y2 <= {scaler_bank, 17'b0};
          end else if (scaler_wr1) begin
-            if (scaler_wr_addr_x2 == scaler_w - 1'b1) begin
+            if (scaler_wr_addr_x2 >= scaler_w - 1'b1) begin
                scaler_wr_addr_x2 <= 0;
             end else begin
                scaler_wr_addr_x2 <= scaler_wr_addr_x2 + 1'b1;
@@ -542,7 +542,7 @@ module life (
             scaler_wr_addr_x2 <= scaler_w - scaler_x_hi[10:1];
             scaler_wr_addr_y2 <= {scaler_bank, 17'b0};
          end else if (scaler_wr1) begin
-            if (scaler_wr_addr_x2 == scaler_w - 1) begin
+            if (scaler_wr_addr_x2 >= scaler_w - 1'b1) begin
                scaler_wr_addr_x2 <= 0;
             end else begin
                scaler_wr_addr_x2 <= scaler_wr_addr_x2 + 1'b1;
