@@ -113,6 +113,9 @@ life
       );
 
    initial begin
+
+      $dumpvars;
+
       // Initialize, otherwise it messes up when probing for roms
       for (i = 0; i < 262144; i = i + 1)
         mem[i] = 0;
@@ -136,24 +139,27 @@ life
       rst_n  = 1'b1;
 
       // load the memory image
-      $readmemh(LIFE_INIT_FILE, mem);
+      // $readmemh(LIFE_INIT_FILE, mem);
 
-      write_ram(200*2+198, 8'hff);
+      mem[12'h897] = 8'h55;
+      mem[12'h95f] = 8'h15;
+      mem[12'ha72] = 8'h05;
+      mem[12'haef] = 8'h01;
+      mem[12'h7d0] = 8'hAA;
+      mem[12'h898] = 8'hA8;
+      mem[12'h960] = 8'h20;
+      mem[12'ha28] = 8'h80;
 
-      write_reg(8'hA4, 8'hA8);
-      write_reg(8'hA5, 8'h19);
-      write_reg(8'hA6, 8'hA0);
+      write_reg(8'hA4, 8'h00);
+      write_reg(8'hA5, 8'h00);
+      write_reg(8'hA6, 8'hBC);
       write_reg(8'hA7, 8'h00);
       write_reg(8'hA8, 8'h04);  // Zoom mode 4 (window 100x75)
 
-      write_reg(8'hA0, 8'h90);  // Runnng + Border
+      write_reg(8'hA0, 8'h00);  // Stopped
 
-      // Wait 15.5ms for first frame to almost complete
-      #(15500 * 1000);
-      $dumpvars;
-
-      // Wait 1.5ms for the next frame to start
-      #(1500 * 1000);
+      // Wait 0.5ms for first few lines
+      #(500 * 1000);
 
       $finish;
 
