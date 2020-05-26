@@ -107,7 +107,7 @@ do
     cp ${build}/${ssd}${i}.ssd $DIR
 done
 cp ${build}/loader.log $DIR
-cp working/life.bit $DIR
+cp working/life.bi[tn] $DIR
 zip -qr $DIR.zip $DIR
 
 echo
