@@ -230,17 +230,16 @@ module life (
    reg                 scaler_wr1 = 0;
    reg                 scaler_wr2 = 0;
    reg                 scaler_wr3 = 0;
-   reg                 scaler_tb_bdr0 = 0;
-   reg                 scaler_tb_bdr1 = 0;
-   reg                 scaler_tb_bdr2 = 0;
-   reg                 scaler_tb_bdr3 = 0;
-   reg [1:0]           scaler_lr_bdr0 = 0;
-   reg [1:0]           scaler_lr_bdr1 = 0;
-   reg [1:0]           scaler_lr_bdr2 = 0;
-   reg [2:0]           scaler_din3 = 0;
+   reg [1:0]           scaler_bdr0 = 0;
+   reg [1:0]           scaler_bdr1 = 0;
+   reg [1:0]           scaler_bdr2 = 0;
+   reg [1:0]           scaler_odd_din3 = 0;
+   reg [1:0]           scaler_eve_din3 = 0;
+
    reg [8:0]           scaler_wr_addr_x2 = 0;
    reg [17:0]          scaler_wr_addr_y2 = 0;
    reg [17:0]          scaler_wr_addr3 = 0;
+   reg                 scaler_din_last = 0;
 
    // Scaler RAM
    reg [1:0]           scaler_ram[0:262143];
@@ -505,22 +504,17 @@ module life (
          scaler_x_in_range0 <= (h_counter >= {1'b0, scaler_x_lo[10:1], 1'b0}) || (h_counter < {1'b0, scaler_x_hi[10:1], 1'b0});
       end
 
-      scaler_tb_bdr0 <= (v_counter == 0 || v_counter == V_ACTIVE - 1) && ctrl_border;
-
-      scaler_lr_bdr0 <= { ((h_counter ==            0)) && ctrl_border,
-                          ((h_counter == H_ACTIVE - 2)) && ctrl_border};
-
-      active0        <= active;
+      scaler_bdr0 <= (v_counter == 0 || v_counter == V_ACTIVE - 1) ? {2{ctrl_border}} : 2'b00;
+      active0     <= active;
 
       // *************************************************************************
       // *** Write Pipeline stage 1, uses outputs of stage 0
       // *************************************************************************
 
-      scaler_wr1     <= scaler_x_in_range0 && |scaler_y_count0 && active0;
-      scaler_rst1    <= scaler_rst0;
-      scaler_lr_bdr1 <= scaler_lr_bdr0;
-      scaler_tb_bdr1 <= scaler_tb_bdr0;
-      active1        <= active0;
+      scaler_wr1  <= scaler_x_in_range0 && |scaler_y_count0 && active0;
+      scaler_rst1 <= scaler_rst0;
+      scaler_bdr1 <= scaler_bdr0;
+      active1     <= active0;
 
       // *************************************************************************
       // *** Write Pipeline stage 2, uses outputs of stage 1
@@ -559,30 +553,48 @@ module life (
          end
       end
 
-      scaler_wr2     <= scaler_wr1;
-      scaler_rst2    <= scaler_rst1;
-      scaler_lr_bdr2 <= scaler_lr_bdr1;
-      scaler_tb_bdr2 <= scaler_tb_bdr1;
-      active2        <= active1;
+      // Add in the the L/R boundart
+      if (scaler_x_lo[0]) begin
+         if (active1 && !active2)
+           scaler_bdr2 <= scaler_bdr1 | {ctrl_border, 1'b0};
+         else if (active1 && !active0)
+           scaler_bdr2 <= scaler_bdr1 | {1'b0, ctrl_border};
+         else
+           scaler_bdr2 <= scaler_bdr1;
+      end else begin
+         if (active1 && !active2)
+           scaler_bdr2 <= scaler_bdr1 | {2{ctrl_border}};
+         else
+           scaler_bdr2 <= scaler_bdr1;
+      end
+
+      scaler_wr2  <= scaler_wr1;
+      scaler_rst2 <= scaler_rst1;
+      active2     <= active1;
 
       // *************************************************************************
       // *** Write Pipeline stage 3, uses outputs of stage 2
       // *************************************************************************
 
+      // Capture the right pixel in the previous sample. This happens to work correctly
+      // even at the wrap point, because extras reads of the last/first columns are
+      // inserted before/after the active line so the life engine works properly.
+      scaler_din_last <= display_dout[6];
+
+      // At odd pixel offets, the two output pixels need to be taken from adjacent samples
+      scaler_odd_din3 <= {scaler_din_last, display_dout[7]} | scaler_bdr2;
+
+      // At even pixel offsets, the two output pixels in the display sample are correctly aligned
+      scaler_eve_din3 <= display_dout[7:6] | scaler_bdr2;
+
       scaler_wr_addr3 <= scaler_wr_addr_y2 + scaler_wr_addr_x2;
-
-      // Capture 3 pixels
-      if (active2)
-        scaler_din3 <= {scaler_din3[0], display_dout[7:6] | scaler_lr_bdr2};
-
-      scaler_wr3     <= scaler_wr2;
-      scaler_tb_bdr3 <= scaler_tb_bdr2;
+      scaler_wr3      <= scaler_wr2;
 
       // *************************************************************************
       // *** Scaler RAM Write
       // *************************************************************************
       if (scaler_wr3)
-        scaler_ram[scaler_wr_addr3] <= (scaler_x_lo[0] ? scaler_din3[1:0] : scaler_din3[2:1]) | {2{scaler_tb_bdr3}};
+        scaler_ram[scaler_wr_addr3] <= scaler_x_lo[0] ? scaler_eve_din3 : scaler_odd_din3;
 
       // When to reset the scaler rd address
       scaler_rd_rst_x <= h_counter == H_ACTIVE;
