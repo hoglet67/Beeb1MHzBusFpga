@@ -150,8 +150,8 @@ life
       mem[12'h960] = 8'h20;
       mem[12'ha28] = 8'h80;
 
-      write_reg(8'hA4, 8'h00);
-      write_reg(8'hA5, 8'h00);
+      write_reg(8'hA4, 8'h3C);
+      write_reg(8'hA5, 8'h18);
       write_reg(8'hA6, 8'hBC);
       write_reg(8'hA7, 8'h00);
       write_reg(8'hA8, 8'h04);  // Zoom mode 4 (window 100x75)

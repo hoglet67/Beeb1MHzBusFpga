@@ -1,19 +1,19 @@
 [*]
 [*] GTKWave Analyzer v3.3.86 (w)1999-2017 BSI
-[*] Tue May 26 11:07:16 2020
+[*] Tue May 26 16:34:51 2020
 [*]
 [dumpfile] "/disk1/home/dmb/atom/Beeb1MHzBusFpga/life/simulation/dump.vcd"
-[dumpfile_mtime] "Tue May 26 10:57:51 2020"
-[dumpfile_size] 12340400
+[dumpfile_mtime] "Tue May 26 16:34:22 2020"
+[dumpfile_size] 12275748
 [savefile] "/disk1/home/dmb/atom/Beeb1MHzBusFpga/life/simulation/signals.gtkw"
-[timestart] 182319000
+[timestart] 114110000
 [size] 1853 1145
 [pos] -1 -1
-*-17.000000 182693798 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-23.000000 142208100 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] life_tb.
 [treeopen] life_tb.DUT.
 [sst_width] 456
-[signals_width] 198
+[signals_width] 214
 [sst_expanded] 1
 [sst_vpaned_height] 342
 @28
@@ -42,9 +42,6 @@ life_tb.DUT.active
 life_tb.DUT.active0
 life_tb.DUT.active1
 life_tb.DUT.active2
-@29
-life_tb.DUT.active3
-@28
 life_tb.DUT.scaler_rst0
 life_tb.DUT.scaler_rst1
 life_tb.DUT.scaler_rst2
@@ -52,15 +49,16 @@ life_tb.DUT.scaler_wr1
 life_tb.DUT.scaler_wr2
 life_tb.DUT.scaler_wr3
 @22
+life_tb.DUT.scaler_wr_addr_x2[8:0]
+@23
+life_tb.DUT.scaler_wr_addr_y2[17:0]
+@22
 life_tb.DUT.scaler_wr_addr3[17:0]
 life_tb.DUT.scaler_x_lo[10:0]
+life_tb.DUT.scaler_x_hi[10:0]
 life_tb.DUT.scaler_y_lo[10:0]
 @28
 life_tb.DUT.scaler_zoom[2:0]
-@22
-life_tb.DUT.scaler_x_lo[10:0]
-life_tb.DUT.scaler_y_lo[10:0]
-@28
 life_tb.DUT.rnw
 @22
 life_tb.DUT.bus_addr[7:0]
@@ -74,9 +72,10 @@ life_tb.DUT.active
 @22
 life_tb.DUT.h_counter[11:0]
 @28
-life_tb.DUT.scaler_even_din3[1:0]
 life_tb.DUT.scaler_odd_din3[1:0]
-life_tb.DUT.scaler_din_first
 life_tb.DUT.scaler_din_last
+@22
+life_tb.DUT.scaler_x_origin[12:0]
+life_tb.DUT.scaler_w[8:0]
 [pattern_trace] 1
 [pattern_trace] 0
