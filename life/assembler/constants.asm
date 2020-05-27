@@ -15,6 +15,9 @@ reg_scaler_zoom     = &FCA8
 reg_scaler_x_speed  = &FCA9
 reg_scaler_y_speed  = &FCAA
 
+reg_gens            = &FC50
+reg_cells           = &FC54
+
 reg_page_lo     = &FCFE
 reg_page_hi     = &FCFF
 reg_jim         = &FD00
@@ -55,7 +58,7 @@ xx              = &76       ; workspace, used by rle_reader, rle_utils
 yy              = &78       ; workspace, used by rle_reader, rle_utils
 count           = &7A       ; workspace, used by rle_reader, rle_utils
 tmp             = &7C       ; short term temporary storage
-last_pattern    = &7E       ; last patten on disk, used by loader
+last_pattern    = &7F       ; last patten on disk, used by loader
 multiplicand    = &80       ; used by maths code, 3 bytes
 multiplier      = &83       ; used by maths code, 1 bytes
 accumulator     = &84       ; used by maths code, 3 bytes

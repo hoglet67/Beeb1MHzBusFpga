@@ -11,6 +11,9 @@ include "constants.asm"
         STA reg_control
         STA reg_speed
 
+        LDA #&C8
+        STA reg_page_hi
+
         ;; Disable the scaler
         JSR reset_scaler
 
@@ -43,33 +46,34 @@ include "constants.asm"
         JSR print_string
         EQUS "No patterns on the current drive", 10, 10
         NOP
-.loop
+.loop1
         JSR print_string
         EQUS 13, "Press 0-3 to select another drive:  ", 127
         NOP
+.loop2
         JSR read_key
+        BCS loop2
         CMP #'0'
-        BCC loop
+        BCC loop1
         CMP #'3'+1
-        BCS loop
+        BCS loop1
         STA drive
 }
 
 .main
 {
         JSR print_string
-        EQUB 22, 0
-        EQUS "Conway Life for the BBC Micro", 10, 10, 13
-        EQUS "Using the FPGA Engine"
+        EQUS 22, 0
+        EQUS "Conway Life for the BBC Micro, using the FPGA Engine ", 10, 10, 13
         NOP
-        LDA #72
-        JSR tab_to_col
+
+        JSR disable_cursor
+
+        JSR display_status
+
         JSR print_string
-        EQUS "Drive: "
+        EQUS 31,0,4
         NOP
-        LDA drive
-        JSR OSWRCH
-        JSR OSNEWL
 
         JSR index_patterns
         BCC save_last
@@ -78,16 +82,19 @@ include "constants.asm"
 .save_last
         STA last_pattern
 
-        LDA #10
-        JSR OSWRCH
+
+        JSR display_prompt
+.prompt
+
+        JSR display_status
 
         JSR print_string
-        EQUS "0-3=drive, Z/X/CURSOR/TAB/COPY=pan/zoom, SPACE=stop/start, RETURN=step", 10, 13
+        EQUS 31,59,31,32,127
         NOP
 
-.prompt
-        JSR display_prompt
         JSR read_key
+        BCS prompt
+
         CMP #'0'
         BCC not_drive
         CMP #'3'+1
@@ -143,14 +150,20 @@ include "constants.asm"
         JMP prompt
 
 .not_f5
+        CMP #'<'
+        BEQ key_speed_dec
         CMP #','
         BNE not_comma
+.key_speed_dec
         JSR speed_dec
         JMP prompt
 
 .not_comma
+        CMP #'>'
+        BEQ key_speed_inc
         CMP #'.'
         BNE not_dot
+.key_speed_inc
         JSR speed_inc
         JMP prompt
 
@@ -234,35 +247,151 @@ include "constants.asm"
         JMP prompt
 }
 
+;;           1111111111222222222233333333334444444444555555555566666666667777777777
+;; 01234567890123456789012345678901234567890123456789012345678901234567890123456789
+
+;; Generation=123456   Cells=123456   X=0000,Y=0000   Zoom=Off   Speed=8x   Drive=2
+
+.disable_cursor
+{
+    JSR print_string
+.vdu
+    EQUB 23,1,0,0,0,0,0,0,0,0
+    NOP
+    RTS
+}
+.display_status
+{
+        LDA #'0'
+        STA pad
+
+        JSR print_string
+        EQUS 31, 0, 2, "Generation="
+        NOP
+        LDA reg_gens
+        STA num
+        LDA reg_gens + 1
+        STA num + 1
+        LDA reg_gens + 2
+        AND #&0F
+        STA num + 2
+        ;; Print 6 digits
+        JSR PrDec20
+
+        JSR print_string
+        EQUS "   Cells="
+        NOP
+        LDA reg_cells
+        STA num
+        LDA reg_cells + 1
+        STA num + 1
+        LDA reg_cells + 2
+        AND #&0F
+        STA num + 2
+        ;; Print 6 digits
+        JSR PrDec20
+
+        JSR print_string
+        EQUS "   X="
+        NOP
+        LDA reg_scaler_x_origin
+        STA num
+        LDA reg_scaler_x_origin + 1
+        LSR A
+        ROR num
+        LSR A
+        ROR num
+        STA num + 1
+        JSR PrDec12
+
+        JSR print_string
+        EQUS ",Y="
+        NOP
+        LDA reg_scaler_y_origin
+        STA num
+        LDA reg_scaler_y_origin + 1
+        LSR A
+        ROR num
+        LSR A
+        ROR num
+        STA num + 1
+        JSR PrDec12
+
+        JSR print_string
+        EQUS "   Zoom="
+        NOP
+        LDX reg_scaler_zoom
+        LDA zoom_table0, X
+        JSR OSWRCH
+        LDA zoom_table1, X
+        JSR OSWRCH
+        LDA zoom_table2, X
+        JSR OSWRCH
+
+        JSR print_string
+        EQUS "   Speed="
+        NOP
+        LDA reg_speed
+        AND #&07
+        CLC
+        ADC #&31
+        JSR OSWRCH
+
+        JSR print_string
+        EQUS "x   Drive="
+        NOP
+        LDA drive
+        ORA #'0'
+        JMP OSWRCH
+
+.zoom_table0
+        EQUS "O2481"
+.zoom_table1
+        EQUS "fxxx6"
+.zoom_table2
+        EQUS "f   x"
+}
 
 .display_prompt
 {
-
         JSR print_string
-        EQUB 13
-        EQUS "F0=clear, F1-3=random, F4=mask, F5=border, A-"
+        EQUS 31,0,30,"CURSOR/TAB/COPY=pan, Z/X=zoom, SPACE=stop/start, RETURN=step, <>=speed", 10, 13
+        EQUS "0-3=drive, F0=clear, F1-3=random, F4=mask, F5=border, A-"
         NOP
 
         LDA last_pattern
         JSR OSWRCH
 
         JSR print_string
-        EQUS "=load pattern:  ", 127
+        EQUS "=load pattern:"
         NOP
         RTS
 }
 
 .read_key
 {
+        BIT &FF
+        BMI escape
+        LDA #&80
+        LDX #&FF
+        JSR OSBYTE
+        CPX #&00
+        BEQ exitc1
         JSR OSRDCH
         BCS escape
         CMP #&20
-        BCC exit
+        BCC exitc0
         CMP #&7F
-        BCS exit
+        BCS exitc0
         JSR OSWRCH
-        .exit
+.exitc0
+        CLC
         RTS
+
+.exitc1
+        SEC
+        RTS
+
 .escape
         LDA #&7E
         JSR OSBYTE
@@ -613,21 +742,20 @@ include "constants.asm"
 
 .clear_screen
 {
+        ; Set the clear flag in the engine, plus the cleat type
         AND #&03
         STA tmp
         LDA reg_control
         AND #&FC
         ORA tmp
-        ORA #ctrl_clear+ctrl_running
+        ORA #ctrl_clear
         STA reg_control
-.wait1  BIT reg_status
-        BPL wait1
-        AND #&FC-ctrl_clear-ctrl_running
-        JSR wait_for_vsync
-        JSR wait_for_vsync
+        ; Step the engine exactly once
+        JSR engine_step
+        ; Reset the clear flag
+        LDA reg_control
+        AND #&FC-ctrl_clear
         STA reg_control
-.wait2  BIT reg_status
-        BMI wait2
         RTS
 }
 

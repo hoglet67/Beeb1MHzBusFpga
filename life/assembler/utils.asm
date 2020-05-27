@@ -54,51 +54,94 @@
 ;  On exit,  A,X,Y,num,pad corrupted
 ;  Size      69 bytes
 
+
+.PrDec24
+        LDY #24                  ; Offset to powers of ten
+        BNE PrDec
+
+.PrDec20
+        LDY #20                  ; Offset to powers of ten
+        BNE PrDec
+
 .PrDec16
-{
+        LDA #0
+        STA num + 2
+        LDY #16                 ; Offset to powers of ten
+        BNE PrDec
+
+.PrDec12
+        LDA #0
+        STA num + 2
+        LDY #12                 ; Offset to powers of ten
+        BNE PrDec
+
+.PrDec8
+        LDA #0
+        STA num + 1
+        STA num + 2
         LDY #8                  ; Offset to powers of ten
-.PrDec16Lp1
+
+.PrDec
+{
+.PrDecLp1
         LDX #&FF
         SEC                     ; Start with digit=-1
-.PrDec16Lp2
+.PrDecLp2
         LDA num+0
-        SBC PrDec16Tens+0,Y
+        SBC PrDecTens+0,Y
         STA num+0               ; Subtract current tens
         LDA num+1
-        SBC PrDec16Tens+1,Y
+        SBC PrDecTens+1,Y
         STA num+1
+        LDA num+2
+        SBC PrDecTens+2,Y
+        STA num+2
         INX
-        BCS PrDec16Lp2          ; Loop until <0
+        BCS PrDecLp2            ; Loop until <0
         LDA num+0
-        ADC PrDec16Tens+0,Y
+        ADC PrDecTens+0,Y
         STA num+0               ; Add current tens back in
         LDA num+1
-        ADC PrDec16Tens+1,Y
+        ADC PrDecTens+1,Y
         STA num+1
+        LDA num+2
+        ADC PrDecTens+2,Y
+        STA num+2
         TXA
-        BNE PrDec16Digit        ; Not zero, print it
+        BNE PrDecDigit          ; Not zero, print it
         LDA pad
-        BNE PrDec16Print
-        BEQ PrDec16Next         ; pad<>0, use it
-.PrDec16Digit
+        BNE PrDecPrint
+        BEQ PrDecNext           ; pad<>0, use it
+.PrDecDigit
         LDX #'0'
         STX pad                 ; No more zero padding
         ORA #'0'                ; Print this digit
-.PrDec16Print
+.PrDecPrint
         JSR OSWRCH
-.PrDec16Next
+.PrDecNext
         DEY
         DEY
-        BPL PrDec16Lp1          ; Loop for next digit
+        DEY
+        DEY
+        BPL PrDecLp1            ; Loop for next digit
         RTS
 
-.PrDec16Tens
-        EQUW 1
-        EQUW 10
-        EQUW 100
-        EQUW 1000
-        EQUW 10000
+.PrDecTens
+        EQUD 1
+        EQUD 10
+        EQUD 100
+        EQUD 1000
+        EQUD 10000
+        EQUD 100000
+        EQUD 1000000
+        EQUD 10000000
 }
+
+
+
+
+
+
 
 
 ;; ************************************************************
