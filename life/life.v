@@ -706,19 +706,26 @@ module life (
 
       // life_rd_addr = 0 (Row0, Col0) needs to coincide with h/v_counter = 0
       //
-      // Row sequence is NR+2:
-      //    0, 1, 2, ..., NR-1, 0, <idle during vsync>, NR-1
-      // (i.e. the first and last rows are read twice)
-      // NR = V_ACTIVE
+      // NR is the number of active rows (same as V_ACTIVE)
+      // NC is the number of active cols (same as H_ACTIVE / 8)
+      // S  is the number of pipeline stages
+      //
+      // At the end of the frame, we preload the pipeline with S rows. This has
+      // the miraculous effect of fixing the top/bottom boundary discontinuity
+      // that would otherwise mess up the multi-stage implementaton. I haven't
+      // yet fully understood why this works!
+      //
+      // Row sequence is NR+S+1:
+      //    0, 1, 2, ..., NR-1, 0, <idle during vsync>, NR-S, NR-S+1, ... NR-1
+      // (i.e. the first and last S rows are read twice)
       //
       // Col sequence is NC+2:
       //    0, 1, 2, ..., NC-1, 0, <idle during hsync>, NC-1
       // (i.e. the first and last cols are read twice)
-      // NC = H_ACTIVE / 8
       //
 
       // Life memory reads are active for NC+2 cols and NR+2 rows compared to the video; pipeline now clocked on this as well
-      life_rd_active <= (h_counter_next[11:3] < (NC + LPD * STAGES) || h_counter_next[11:3] == (TC - 1)) && (v_counter_next < (NR + STAGES) || v_counter_next >= (TR - 2));
+      life_rd_active <= (h_counter_next[11:3] < (NC + LPD * STAGES) || h_counter_next[11:3] == (TC - 1)) && (v_counter_next < (NR + STAGES) || v_counter_next > (TR - 1 - STAGES));
 
       // Life memory writes are active for NC cols and NR rows, but skewed by a couple of cycles
       life_wr_active <= (h_counter_next[11:3] >= (LPD * STAGES)) && (h_counter_next[11:3] < (NC + LPD * STAGES)) && (v_counter_next >= STAGES) && (v_counter_next < (NR + STAGES));
@@ -734,8 +741,8 @@ module life (
            life_col_addr <= life_col_addr + 1'b1;
          // Generate the row part of the address
          if (h_counter[11:3] == TC - 2)
-           if (v_counter == TR - 3)
-             life_row_addr <= (NR - 2) * NC;
+           if (v_counter == TR - 1 - STAGES)
+             life_row_addr <= (NR - STAGES) * NC;
            else if (life_row_addr == (NR - 1) * NC)
              life_row_addr <= 0;
            else
