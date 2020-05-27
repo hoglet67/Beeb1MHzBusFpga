@@ -132,6 +132,9 @@ module life (
 
 `endif
 
+   // Number of cascaded life pipeline stages, max of 8 stages
+   localparam STAGES        = 8;
+
    // Numver of address bits used for playfield pointers
    localparam ASIZE         = 18;
 
@@ -146,12 +149,6 @@ module life (
 
    // Total number of (byte) cols on the display
    localparam TC            = H_TOTAL / 8;
-
-   // Write Offset, must be a whole number of rows
-   localparam WR_OFFSET     = NC;
-
-   // Write Offset when wrapping
-   localparam WR_WRAP       = (NC * NR) - WR_OFFSET;
 
    // Video Pipeline Delay (inc SRAM) in clk_pixel cycles
    localparam VPD           = 2;
@@ -216,7 +213,7 @@ module life (
    reg [10:0]          scaler_x_hi = 0;
    reg [10:0]          scaler_y_lo = 0;
    reg [3:0]           scaler_inc_x_mask = 0;
-   reg [3:0]           scaler_inc_y_mask = 0;
+   reg [3:0]           scaler_inc_y_mask = 1; // To prevent Xilinx warning
 
    // Scaler write pipeline
    reg                 active0 = 0;
@@ -225,7 +222,6 @@ module life (
    reg [9:0]           scaler_y_count0 = 0;
    reg                 scaler_rst0 = 0;
    reg                 scaler_rst1 = 0;
-   reg                 scaler_rst2 = 0;
    reg                 scaler_x_in_range0 = 0;
    reg                 scaler_wr1 = 0;
    reg                 scaler_wr2 = 0;
@@ -264,14 +260,10 @@ module life (
    wire [ASIZE-1:0]    life_rd_addr;
    reg [7:0]           life_rd_data = 0;
    reg                 life_wr_active = 0;
-   reg [(LPD-1)*ASIZE-1:0] life_wr_addr0 = 0;
    reg [ASIZE-1:0]     life_wr_addr = 0;
    wire [7:0]          life_wr_data;
    reg [ASIZE-1:0]     life_col_addr = 0;
    reg [ASIZE-1:0]     life_row_addr = 0;
-   wire [ASIZE-1:0]    life_wr_offset = WR_OFFSET;
-   wire [ASIZE-1:0]    life_wr_wrap = WR_WRAP;
-   reg                 life_pl_active = 0;
    reg [7:0]           display_dout = 0;
    reg                 running = 0;
    reg                 life_bank = 0;
@@ -300,7 +292,10 @@ module life (
    wire                ctrl_border      = control[4];
    wire [1:0]          ctrl_clear_type  = control[1:0];
 
-   wire [7:0]          status = { running, vsync, 6'b000000};
+   reg [2:0]           ctrl_stage_enabled = 0;
+   reg [STAGES-1:1]    stage_enabled = 0;
+
+   wire [7:0]          status = { running, vsync, 3'b000, ctrl_stage_enabled};
 
    wire [7:0]          width_div_8 = H_ACTIVE / 8;
    wire [7:0]          height_div_8 = V_ACTIVE / 8;
@@ -311,6 +306,11 @@ module life (
    reg [30:0]          prbs2 = 31'h2fe457aa;
 
    genvar              i;
+   integer             s;
+
+   function [ASIZE-1:0] truncate_address(input [ASIZE:0] addr);
+      truncate_address = addr[ASIZE-1:0];
+   endfunction
 
    // =================================================
    // Clock Generation
@@ -539,7 +539,7 @@ module life (
       end else begin
          // The window crosses the L/R boundary
          if (scaler_rst1) begin
-            scaler_wr_addr_x2 <= scaler_w - scaler_x_hi[10:1];
+            scaler_wr_addr_x2 <= scaler_w - scaler_x_hi[9:1];
             scaler_wr_addr_y2 <= {scaler_bank, 17'b0};
          end else if (scaler_wr1) begin
             if (scaler_wr_addr_x2 >= scaler_w - 1'b1) begin
@@ -569,7 +569,6 @@ module life (
       end
 
       scaler_wr2  <= scaler_wr1;
-      scaler_rst2 <= scaler_rst1;
       active2     <= active1;
 
       // *************************************************************************
@@ -684,11 +683,18 @@ module life (
    // Life Pipeline
    // =================================================
 
-   life_pipeline #(NC + LPD + 1) lp
-     (.clk       (clk_pixel),
-      .clken     (life_clken),
-      .read_data (life_rd_data),
-      .write_data(life_wr_data));
+   wire [STAGES*8-1:0] stage;
+   generate
+      for (i = 0; i < STAGES; i = i + 1) begin : b_life
+         life_pipeline #(NC + LPD * STAGES + 1) lp
+               (.clk       (clk_pixel),
+                .clken     (life_clken),
+                .enabled   ((i == 0) ? 1'b1         : stage_enabled[i]),
+                .read_data ((i == 0) ? life_rd_data : stage[(i-1)*8+7:(i-1)*8]),
+                .write_data(stage[i*8+7:i*8]));
+      end
+   endgenerate
+   assign life_wr_data = stage[STAGES*8-1:STAGES*8-8];
 
    // =================================================
    // Life Address Generation
@@ -701,63 +707,66 @@ module life (
       // life_rd_addr = 0 (Row0, Col0) needs to coincide with h/v_counter = 0
       //
       // Row sequence is NR+2:
-      //    0, 1, 2, ..., NR-1, 0, NR-1, <idle during vsync>
+      //    0, 1, 2, ..., NR-1, 0, <idle during vsync>, NR-1
       // (i.e. the first and last rows are read twice)
       // NR = V_ACTIVE
       //
       // Col sequence is NC+2:
-      //    0, 1, 2, ..., NC-1, 0, NC-1 <idle during hsync>
+      //    0, 1, 2, ..., NC-1, 0, <idle during hsync>, NC-1
       // (i.e. the first and last cols are read twice)
       // NC = H_ACTIVE / 8
       //
 
-      // Life reads are active for NC+2 cols and NR+2 rows compared to the video
-      life_rd_active <= (h_counter_next[11:3] < (NC + 1) || h_counter_next[11:3] == TC - 1) && (v_counter_next < (NR + 1) || v_counter_next == TR - 1);
+      // Life memory reads are active for NC+2 cols and NR+2 rows compared to the video; pipeline now clocked on this as well
+      life_rd_active <= (h_counter_next[11:3] < (NC + LPD * STAGES) || h_counter_next[11:3] == (TC - 1)) && (v_counter_next < (NR + STAGES) || v_counter_next >= (TR - 2));
 
-      // Life pipeline active for one col more to flush
-      life_pl_active <= (h_counter_next[11:3] < (NC + 3) || h_counter_next[11:3] == TC - 1) && (v_counter_next < (NR + 1) || v_counter_next == TR - 1);
+      // Life memory writes are active for NC cols and NR rows, but skewed by a couple of cycles
+      life_wr_active <= (h_counter_next[11:3] >= (LPD * STAGES)) && (h_counter_next[11:3] < (NC + LPD * STAGES)) && (v_counter_next >= STAGES) && (v_counter_next < (NR + STAGES));
 
-      // Life writes are active for NC cols and NR rows, but skewed by a couple of cycles
-      life_wr_active <= (h_counter_next[11:3] >= 3) && (h_counter_next[11:3] < (NC + 3)) && (v_counter_next > 0) && (v_counter_next <= NR);
-
-      // Increment on the 11 cycle, so address stable when next memory cycles start
+      // Increment on the 11 cycle, so address stable when next memory cycle starts
       if (h_counter[2:1] == 2'b11) begin
-         if (life_rd_active) begin
-            // Generate the column part of the address
-            if (h_counter[11:3] == NC)
-              life_col_addr <= NC - 1;
-            else if (life_col_addr == NC - 1)
-              life_col_addr <= 0;
-            else
-              life_col_addr <= life_col_addr + 1'b1;
-            // Generate the row part of the address
-            if (h_counter[11:3] == NC)
-              if (v_counter == NR)
-                life_row_addr <= (NR - 1) * NC;
-              else if (life_row_addr == (NR - 1) * NC)
-                life_row_addr <= 0;
+         // Generate the column part of the address
+         if (h_counter[11:3] == TC - 2)
+           life_col_addr <= NC - 1;
+         else if (life_col_addr == NC - 1)
+           life_col_addr <= 0;
+         else
+           life_col_addr <= life_col_addr + 1'b1;
+         // Generate the row part of the address
+         if (h_counter[11:3] == TC - 2)
+           if (v_counter == TR - 3)
+             life_row_addr <= (NR - 2) * NC;
+           else if (life_row_addr == (NR - 1) * NC)
+             life_row_addr <= 0;
+           else
+             life_row_addr <= truncate_address(life_row_addr + NC);
+      end
+
+      // Increment on the 11 cycle, so address stable when next memory cycle starts
+      if (h_counter[2:1] == 2'b01) begin
+         if (life_wr_active) begin
+            // The patter of write addresses is simply sequential
+            if (v_counter == STAGES && h_counter[11:3] == LPD * STAGES)
+                life_wr_addr <= 0;
               else
-                life_row_addr <= life_row_addr + NC;
+                life_wr_addr <= life_wr_addr + 1'b1;
          end
       end
 
-      // Skew life_wr_addr by the byte delay through the life pipeline, plus a whole row
-      if (h_counter[2:1] == 2'b11)
-        if (life_rd_addr < WR_OFFSET)
-          {life_wr_addr, life_wr_addr0} <= {life_wr_addr0, life_rd_addr + life_wr_wrap};
-        else
-          {life_wr_addr, life_wr_addr0} <= {life_wr_addr0, life_rd_addr - life_wr_offset};
-
       // Life pipeline clocked for just one cycle out of four
-      life_clken <= (h_counter[2:1] == 2'b10) && life_pl_active;
+      life_clken <= (h_counter[2:1] == 2'b10) && life_rd_active;
 
       // Just after the last row of writes is a safe place to
-      if (h_counter[2:1] == 2'b11 && h_counter[11:3] == NC + LPD && v_counter == NR) begin
+      if (h_counter[2:1] == 2'b11 && h_counter[11:3] == NC + LPD * STAGES && v_counter == NR + STAGES - 1) begin
          // Switch to view bank just written, if we are running
          if (running)
            life_bank <= !life_bank;
          // Update running from the register
          running <= ctrl_running;
+         // Update the stage enabled bits
+         for (s = 1; s < STAGES; s = s + 1)
+           stage_enabled[s] <= (ctrl_stage_enabled >= s);
+
       end
    end
 
@@ -934,6 +943,8 @@ module life (
            cpu_addr[15:8] <= bus_data;
          if (!pgfc_n && bus_addr == 8'hA0 && !rnw)
            control <= bus_data;
+         if (!pgfc_n && bus_addr == 8'hA1 && !rnw)
+           ctrl_stage_enabled <= bus_data[2:0];
          if (!pgfc_n && bus_addr == 8'hA4 && !rnw)
            scaler_x_origin[7:0] <= bus_data;
          if (!pgfc_n && bus_addr == 8'hA5 && !rnw)
@@ -1037,12 +1048,14 @@ module life_pipeline
   (
    clk,
    clken,
+   enabled,
    read_data,
    write_data
    );
 
    input clk;
    input clken;
+   input enabled;
    input [7:0] read_data;
    output reg [7:0] write_data;
 
@@ -1068,7 +1081,8 @@ module life_pipeline
    generate
       for (i = 0; i < 8; i = i + 1) begin : b_cell
          life_cell c
-               (.top(a[i+9:i+7]),
+               (.enabled(enabled),
+                .top(a[i+9:i+7]),
                 .middle(b[i+9:i+7]),
                 .bottom(c[i+9:i+7]),
                 .result(d[i]));
@@ -1089,11 +1103,13 @@ endmodule
 
 module life_cell
   (
+   enabled,
    top,
    middle,
    bottom,
    result
    );
+   input enabled;
    input [2:0] top;
    input [2:0] middle;
    input [2:0] bottom;
@@ -1130,7 +1146,7 @@ module life_cell
    wire [2:0] p2 = partial_sum({bottom, middle[0]});
    wire [3:0] sum = p1 + p2;
 
-   assign result = (sum == 2) ? middle[1] :
-                   (sum == 3) ? 1'b1      :
+   assign result = (sum == 2 || !enabled) ? middle[1] :
+                   (sum == 3            ) ? 1'b1      :
                    1'b0 ;
 endmodule
