@@ -293,6 +293,7 @@ module life (
    wire [1:0]          ctrl_clear_type  = control[1:0];
 
    reg [2:0]           ctrl_stage_enabled = 0;
+   reg [3:0]           speed_bin = 0;
    reg [STAGES-1:1]    stage_enabled = 0;
 
    wire [7:0]          status = { running, vsync, 3'b000, ctrl_stage_enabled};
@@ -308,8 +309,17 @@ module life (
    genvar              i;
    integer             s;
 
+   reg [7:0]           cells8;
+   reg [31:0]          cells_tmp;
+   reg [31:0]          cells;
+   reg [31:0]          gens;
+
    function [ASIZE-1:0] truncate_address(input [ASIZE:0] addr);
       truncate_address = addr[ASIZE-1:0];
+   endfunction
+
+   function [3:0] count_live_cells(input [7:0] d);
+      count_live_cells = d[0] + d[1] + d[2] + d[3] + d[4] + d[5] + d[6] + d[7];
    endfunction
 
    // =================================================
@@ -773,8 +783,19 @@ module life (
          // Update the stage enabled bits
          for (s = 1; s < STAGES; s = s + 1)
            stage_enabled[s] <= (ctrl_stage_enabled >= s);
-
+         speed_bin <= ctrl_stage_enabled + 3'b001;
+         // Update stats
+         cells_tmp <= 0;
+         cells     <= cells_tmp;
+         if (ctrl_clear)
+           gens <= 0;
+         else if (running)
+           gens <= gens + speed_bin;
       end
+
+      if (active && h_counter[2:1] == 2'b11)
+        cells_tmp <= cells_tmp + count_live_cells(cells8);
+
    end
 
    // =================================================
@@ -823,6 +844,8 @@ module life (
       if (h_counter[2:1] == 2'b10) begin
          // Capture Data from Life Read Cycle for display
          display_dout <= ram_data;
+         // Take a copy for counting
+         cells8 <= ram_data;
       end else begin
          // Shift two pixels regardless, this avoids right column display artifacts
          display_dout <= {display_dout[5:0], 2'b0};
@@ -832,16 +855,16 @@ module life (
       //  (v_counter is 1 line ahead of the write address)
       //  (h_counter is 2 bytes ahead of the write address)
       if (h_counter[2:1] == 2'b01) begin
-         if (ctrl_mask && v_counter == 1)
+         if (ctrl_mask && v_counter == STAGES)
            // Top
            mask <= 8'h00;
-         else if (ctrl_mask && v_counter == 0)
+         else if (ctrl_mask && v_counter == STAGES - 1)
            // Bottom
            mask <= 8'h00;
-         else if (ctrl_mask && h_counter[11:3] == 3)
+         else if (ctrl_mask && h_counter[11:3] == STAGES * LPD)
            // Left
            mask <= 8'h7f;
-         else if (ctrl_mask && h_counter[11:3] == 2)
+         else if (ctrl_mask && h_counter[11:3] == STAGES * LPD - 1)
            // Right
            mask <= 8'hfe;
          else
@@ -1018,11 +1041,20 @@ module life (
                      (!pgfc_n && bus_addr == 8'hA8 && rnw) ?  scaler_zoom                          :
                      (!pgfc_n && bus_addr == 8'hA9 && rnw) ?  scaler_x_speed                       :
                      (!pgfc_n && bus_addr == 8'hAA && rnw) ?  scaler_y_speed                       :
+                     (!pgfc_n && bus_addr == 8'h50 && rnw) ?  gens[7:0]                            :
+                     (!pgfc_n && bus_addr == 8'h51 && rnw) ?  gens[15:8]                           :
+                     (!pgfc_n && bus_addr == 8'h52 && rnw) ?  gens[23:16]                          :
+                     (!pgfc_n && bus_addr == 8'h53 && rnw) ?  gens[31:24]                          :
+                     (!pgfc_n && bus_addr == 8'h54 && rnw) ?  cells[7:0]                           :
+                     (!pgfc_n && bus_addr == 8'h55 && rnw) ?  cells[15:8]                          :
+                     (!pgfc_n && bus_addr == 8'h56 && rnw) ?  cells[23:16]                         :
+                     (!pgfc_n && bus_addr == 8'h57 && rnw) ?  cells[31:24]                         :
                      (!pgfd_n && selected          && rnw) ?  cpu_rd_data                          :
                      8'hZZ;
 
    assign bus_data_oel = !(
-                           (clke && !pgfc_n && (bus_addr[7:4] == 4'hA || bus_addr == 8'hFE || bus_addr == 8'hFF)) ||
+                           (clke && !pgfc_n && selected && (bus_addr[7:4] == 4'h5 || bus_addr[7:4] == 4'hA)) ||
+                           (clke && !pgfc_n && !rnw     && (bus_addr == 8'hFE || bus_addr == 8'hFF)) ||
                            (clke && !pgfd_n && selected));
 
    assign bus_data_dir = rnw;
