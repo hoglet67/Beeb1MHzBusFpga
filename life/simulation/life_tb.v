@@ -114,8 +114,6 @@ life
 
    initial begin
 
-      $dumpvars;
-
       // Initialize, otherwise it messes up when probing for roms
       for (i = 0; i < 262144; i = i + 1)
         mem[i] = 0;
@@ -156,10 +154,15 @@ life
       write_reg(8'hA7, 8'h00);
       write_reg(8'hA8, 8'h04);  // Zoom mode 4 (window 100x75)
 
-      write_reg(8'hA0, 8'h00);  // Stopped
+      write_reg(8'hA0, 8'h80);  // Started
 
-      // Wait 0.5ms for first few lines
-      #(500 * 1000);
+      // Wait 15.5ms for most of the first frame
+      #(15500 * 1000);
+
+      $dumpvars;
+
+      // Wait 1.5ms for first few lines of the next frame
+      #(1500 * 1000);
 
       $finish;
 
