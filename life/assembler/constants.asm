@@ -5,6 +5,7 @@ MIN_ZOOM            = 0
 MAX_ZOOM            = 4
 
 reg_control         = &FCA0
+reg_speed           = &FCA1
 reg_status          = &FCA1
 reg_x_size          = &FCA2
 reg_y_size          = &FCA3

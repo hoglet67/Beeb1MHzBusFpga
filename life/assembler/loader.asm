@@ -9,6 +9,7 @@ include "constants.asm"
         ;; Initialize the control defaukts
         LDA #0
         STA reg_control
+        STA reg_speed
 
         ;; Disable the scaler
         JSR reset_scaler
@@ -142,6 +143,18 @@ include "constants.asm"
         JMP prompt
 
 .not_f5
+        CMP #','
+        BNE not_comma
+        JSR speed_dec
+        JMP prompt
+
+.not_comma
+        CMP #'.'
+        BNE not_dot
+        JSR speed_inc
+        JMP prompt
+
+.not_dot
         CMP #'Z'
         BNE not_z
         JSR zoom_inc
@@ -357,6 +370,30 @@ include "constants.asm"
 .exit
         RTS
 }
+
+.speed_inc
+{
+        ;; Bits 0-2 are speed
+        LDA reg_speed
+        AND #&07
+        CMP #&07
+        BEQ exit
+        INC reg_speed
+.exit
+        RTS
+}
+
+.speed_dec
+{
+        ;; Bits 0-2 are speed
+        LDA reg_speed
+        AND #&07
+        BEQ exit
+        DEC reg_speed
+.exit
+        RTS
+}
+
 
 .pan_right
 {
