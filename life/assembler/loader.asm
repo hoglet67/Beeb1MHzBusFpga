@@ -89,7 +89,7 @@ include "constants.asm"
         JSR display_status
 
         JSR print_string
-        EQUS 31,59,31,32,127
+        EQUS 31,71,31,32,127
         NOP
 
         JSR read_key
