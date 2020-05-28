@@ -1,4 +1,4 @@
-`define STAGES         10     // The number of cascaded life pipeline stages (max that will fit is 10)
+`define STAGES          8     // The number of cascaded life pipeline stages (max that will fit is 10)
 
 `define VERSION_MAJ 8'h00     // Major version is updated when ever there are incompatible register changes
 `define VERSION_MIN 8'h00     // Minor version is updated when ever there are other changes
@@ -6,9 +6,14 @@
 `define MAGIC_HI    8'h19     // Used to identify the presence of the hardware
 `define MAGIC_LO    8'h67     // Used to identify the presence of the hardware
 
+
 //`define VGA_1920_1080
 
 `define VGA_1600_1200
+
+//`define VGA_1280_1024
+
+//`define VGA_1024_768
 
 //`define VGA_800_600
 
@@ -94,7 +99,7 @@ module life (
    localparam V_SYNC_END    = V_SYNC_START + 5;
    localparam V_TOTAL       = V_SYNC_END + 36;
 
-   // DCM
+   // DCM = 75MHz
    localparam DCM_M         = 3;
    localparam DCM_D         = 2;
    localparam DCM_M2        = 0;
@@ -116,7 +121,7 @@ module life (
    localparam V_SYNC_END    = V_SYNC_START + 3;
    localparam V_TOTAL       = V_SYNC_END + 46;
 
-   // DCM
+   // DCM = 81MHz
    localparam DCM_M         = 9;
    localparam DCM_D         = 5;
    localparam DCM_M2        = 9;
@@ -124,10 +129,54 @@ module life (
 
 `endif
 
+`ifdef VGA_1280_1024
+
+   // H_TOTAL = 1666
+   localparam H_ACTIVE      = 11'd1280;
+   localparam H_SYNC_START  = H_ACTIVE + 48;
+   localparam H_SYNC_END    = H_SYNC_START + 112;
+   localparam H_TOTAL       = H_SYNC_END + 248;
+
+   // V_TOTAL = 1066
+   localparam V_ACTIVE      = 11'd1024;
+   localparam V_SYNC_START  = V_ACTIVE + 1;
+   localparam V_SYNC_END    = V_SYNC_START + 3;
+   localparam V_TOTAL       = V_SYNC_END + 38;
+
+   // DCM - 54MHz
+   localparam DCM_M         = 27;
+   localparam DCM_D         = 25;
+   localparam DCM_M2        = 0;
+   localparam DCM_D2        = 0;
+
+`endif
+
+`ifdef VGA_1024_768
+
+   // H_TOTAL = 1344
+   localparam H_ACTIVE      = 11'd1024;
+   localparam H_SYNC_START  = H_ACTIVE + 24;
+   localparam H_SYNC_END    = H_SYNC_START + 136;
+   localparam H_TOTAL       = H_SYNC_END + 160;
+
+   // V_TOTAL = 806
+   localparam V_ACTIVE      = 10'd600;
+   localparam V_SYNC_START  = V_ACTIVE + 3;
+   localparam V_SYNC_END    = V_SYNC_START + 6;
+   localparam V_TOTAL       = V_SYNC_END + 29;
+
+   // DCM - 32.5MHz
+   localparam DCM_M         = 13;
+   localparam DCM_D         = 20;
+   localparam DCM_M2        = 0;
+   localparam DCM_D2        = 0;
+
+`endif
+
 `ifdef VGA_800_600
 
    // H_TOTAL = 1056
-   localparam H_ACTIVE      = 10'd800;
+   localparam H_ACTIVE      = 11'd800;
    localparam H_SYNC_START  = H_ACTIVE + 40;
    localparam H_SYNC_END    = H_SYNC_START + 128;
    localparam H_TOTAL       = H_SYNC_END + 88;
@@ -138,7 +187,7 @@ module life (
    localparam V_SYNC_END    = V_SYNC_START + 4;
    localparam V_TOTAL       = V_SYNC_END + 23;
 
-   // DCM
+   // DCM - 20MHz
    localparam DCM_M         = 4;
    localparam DCM_D         = 10;
    localparam DCM_M2        = 0;
