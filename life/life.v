@@ -1,4 +1,7 @@
-`define STAGES          8     // The number of cascaded life pipeline stages (max that will fit is 10)
+`define STAGES          8     // The number of cascaded life pipeline stages
+
+                              // The max number that will fit is 10. Above 8 stages there are
+                              // issues on the vertical boundary because only column is prefetched
 
 `define VERSION_MAJ 8'h00     // Major version is updated when ever there are incompatible register changes
 `define VERSION_MIN 8'h00     // Minor version is updated when ever there are other changes
