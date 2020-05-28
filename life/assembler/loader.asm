@@ -81,6 +81,11 @@ include "constants.asm"
         LDY #&00
         JSR OSBYTE
 
+        ;; Flush any junk from the keyboard buffer
+        LDA #&15
+        LDX #&00
+        JSR OSBYTE
+
         ;; Show something nice while indexing RLE files
         LDA #1
         JSR clear_screen
@@ -149,16 +154,19 @@ include "constants.asm"
 
 
         JSR display_prompt
-.prompt
 
+.prompt
         JSR display_status
 
         JSR print_string
         EQUS 31,71,31,32,127
         NOP
 
+.wait_for_key
+        JSR update_counts
+
         JSR read_key
-        BCS prompt
+        BCS wait_for_key
 
         CMP #'0'
         BCC not_drive
@@ -320,20 +328,25 @@ include "constants.asm"
 
 .disable_cursor
 {
-    JSR print_string
+        JSR print_string
 .vdu
-    EQUB 23,1,0,0,0,0,0,0,0,0
-    NOP
-    RTS
+        EQUB 23,1,0,0,0,0,0,0,0,0
+        NOP
+        RTS
 }
-.display_status
+
+.update_counts
 {
         LDA #'0'
         STA pad
 
-        JSR print_string
-        EQUS 31, 0, 2, "Generation="
-        NOP
+        LDA #31
+        JSR OSWRCH
+        LDA #11
+        JSR OSWRCH
+        LDA #2
+        JSR OSWRCH
+        ;; Update generation count
         LDA reg_gens
         STA num
         LDA reg_gens + 1
@@ -344,9 +357,13 @@ include "constants.asm"
         ;; Print 6 digits
         JSR PrDec20
 
-        JSR print_string
-        EQUS "  Live="
-        NOP
+        LDA #31
+        JSR OSWRCH
+        LDA #25
+        JSR OSWRCH
+        LDA #2
+        JSR OSWRCH
+        ;; Update cells count
         LDA reg_cells
         STA num
         LDA reg_cells + 1
@@ -356,9 +373,19 @@ include "constants.asm"
         STA num + 2
         ;; Print 6 digits
         JSR PrDec20
+        RTS
+
+}
+
+.display_status
+{
+        LDA #'0'
+        STA pad
 
         JSR print_string
-        EQUS "  X="
+        EQUS 31,  0, 2, "Generation="
+        EQUS 31, 17, 2, "  Cells="
+        EQUS 31, 31, 2, "  X="
         NOP
         LDA reg_scaler_x_origin
         STA num
@@ -402,6 +429,8 @@ include "constants.asm"
         CLC
         ADC #&1
         STA num
+        LDA #0
+        STA pad
         JSR PrDec4
 
         JSR print_string
