@@ -1,4 +1,6 @@
-`define VERSION_MAJ 8'h00     // Major version is updated when ever there are incomatible register changes
+`define STAGES         10     // The number of cascaded life pipeline stages (max that will fit is 10)
+
+`define VERSION_MAJ 8'h00     // Major version is updated when ever there are incompatible register changes
 `define VERSION_MIN 8'h00     // Minor version is updated when ever there are other changes
 
 `define MAGIC_HI    8'h19     // Used to identify the presence of the hardware
@@ -138,8 +140,8 @@ module life (
 
 `endif
 
-   // Number of cascaded life pipeline stages, max of 8 stages
-   localparam STAGES        = 8;
+   // Number of cascaded life pipeline stages
+   localparam STAGES        = `STAGES;
 
    // Numver of address bits used for playfield pointers
    localparam ASIZE         = 18;
@@ -302,11 +304,11 @@ module life (
    wire                ctrl_border      = control[4];
    wire [1:0]          ctrl_clear_type  = control[1:0];
 
-   reg [2:0]           ctrl_stage_enabled = 0;
-   reg [3:0]           speed_bin = 0;
+   reg [3:0]           ctrl_stage_enabled = 0;
+   reg [4:0]           speed_bin = 0;
    reg [STAGES-1:1]    stage_enabled = 0;
 
-   wire [7:0]          status = { running, vsync, 3'b000, ctrl_stage_enabled};
+   wire [7:0]          status = { running, vsync, 2'b00, ctrl_stage_enabled};
 
    wire [7:0]          width_div_8 = H_ACTIVE / 8;
    wire [7:0]          height_div_8 = V_ACTIVE / 8;
@@ -323,6 +325,10 @@ module life (
    reg [31:0]          cells_tmp;
    reg [31:0]          cells;
    reg [31:0]          gens;
+
+   function [7:0] to_byte(input [31:0] i);
+      to_byte = i[7:0];
+   endfunction
 
    function [ASIZE-1:0] truncate_address(input [ASIZE:0] addr);
       truncate_address = addr[ASIZE-1:0];
@@ -793,7 +799,7 @@ module life (
          // Update the stage enabled bits
          for (s = 1; s < STAGES; s = s + 1)
            stage_enabled[s] <= (ctrl_stage_enabled >= s);
-         speed_bin <= ctrl_stage_enabled + 3'b001;
+         speed_bin <= ctrl_stage_enabled + 4'b1;
          // Update stats
          cells_tmp <= 0;
          cells     <= cells_tmp;
@@ -998,7 +1004,7 @@ module life (
          if (!pgfd_n && selected_reg && bus_addr == 8'h00 && !rnw)
            control <= bus_data;
          if (!pgfd_n && selected_reg && bus_addr == 8'h01 && !rnw)
-           ctrl_stage_enabled <= bus_data[2:0];
+           ctrl_stage_enabled <= bus_data[3:0];
          if (!pgfd_n && selected_reg && bus_addr == 8'h04 && !rnw)
            scaler_x_origin[7:0] <= bus_data;
          if (!pgfd_n && selected_reg && bus_addr == 8'h05 && !rnw)
@@ -1056,7 +1062,7 @@ module life (
                      (!pgfd_n && selected_reg && bus_addr == 8'h08 && rnw) ?  scaler_zoom                          :
                      (!pgfd_n && selected_reg && bus_addr == 8'h09 && rnw) ?  scaler_x_speed                       :
                      (!pgfd_n && selected_reg && bus_addr == 8'h0A && rnw) ?  scaler_y_speed                       :
-                     (!pgfd_n && selected_reg && bus_addr == 8'h0B && rnw) ?  STAGES - 1                           :
+                     (!pgfd_n && selected_reg && bus_addr == 8'h0B && rnw) ?  to_byte(STAGES - 1)                  :
                      (!pgfd_n && selected_reg && bus_addr == 8'h0C && rnw) ?  `MAGIC_LO                            :
                      (!pgfd_n && selected_reg && bus_addr == 8'h0D && rnw) ?  `MAGIC_HI                            :
                      (!pgfd_n && selected_reg && bus_addr == 8'h0E && rnw) ?  `VERSION_MIN                         :
