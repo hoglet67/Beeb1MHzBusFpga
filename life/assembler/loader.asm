@@ -646,7 +646,7 @@ include "constants.asm"
 }
 
 ; A is the 8-bit amount to increment by
-; X indicates the register in page &FC00 to update
+; X indicates the register in page reg_jim to update
 ; Y indicates the limit div 8
 .pan_increment
 {
@@ -658,10 +658,10 @@ include "constants.asm"
 
         ; perform a 16-bit addition
         CLC
-        LDA &FC00, X
+        LDA reg_jim, X
         ADC tmp
         STA accumulator
-        LDA &FC01, X
+        LDA reg_jim + 1, X
         ADC tmp + 1
         STA accumulator + 1
 
@@ -682,14 +682,14 @@ include "constants.asm"
         ; Write registers back
         JSR wait_for_vsync
         LDA accumulator
-        STA &FC00, X
+        STA reg_jim, X
         LDA accumulator + 1
-        STA &FC01, X
+        STA reg_jim + 1, X
         RTS
 }
 
 ; A is the 8-bit amount to decrement by
-; X indicates the register in page &FC00 to update
+; X indicates the register in page reg_jim to update
 ; Y indicates the limit div 8
 .pan_decrement
 {
@@ -701,10 +701,10 @@ include "constants.asm"
 
         ; perform a 16-bit subraction
         SEC
-        LDA &FC00, X
+        LDA reg_jim, X
         SBC tmp
         STA accumulator
-        LDA &FC01, X
+        LDA reg_jim + 1, X
         SBC tmp + 1
         STA accumulator + 1
 
@@ -725,9 +725,9 @@ include "constants.asm"
         ; Write registers back
         JSR wait_for_vsync
         LDA accumulator
-        STA &FC00, X
+        STA reg_jim, X
         LDA accumulator + 1
-        STA &FC01, X
+        STA reg_jim + 1, X
         RTS
 }
 
