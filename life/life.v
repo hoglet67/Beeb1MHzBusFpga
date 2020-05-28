@@ -97,6 +97,8 @@ module life (
    // DCM
    localparam DCM_M         = 3;
    localparam DCM_D         = 2;
+   localparam DCM_M2        = 0;
+   localparam DCM_D2        = 0;
 
 `endif
 
@@ -115,8 +117,10 @@ module life (
    localparam V_TOTAL       = V_SYNC_END + 46;
 
    // DCM
-   localparam DCM_M         = 13;
-   localparam DCM_D         = 8;
+   localparam DCM_M         = 9;
+   localparam DCM_D         = 5;
+   localparam DCM_M2        = 9;
+   localparam DCM_D2        = 10;
 
 `endif
 
@@ -137,6 +141,8 @@ module life (
    // DCM
    localparam DCM_M         = 4;
    localparam DCM_D         = 10;
+   localparam DCM_M2        = 0;
+   localparam DCM_D2        = 0;
 
 `endif
 
@@ -173,6 +179,9 @@ module life (
 
    // Clocks
    wire                clk0;
+   wire                clk1;
+   wire                clk2;
+   wire                locked1;
    wire                clk_pixel;
    wire                clk_pixel_n;
 
@@ -342,39 +351,103 @@ module life (
    // Clock Generation
    // =================================================
 
-   // 50MHz->150.0MHz giving a frame rate of 60.606Hz @ 1920x1080
-   // 50MHz->162.5MHz giving a frame rate of 60.185Hz @ 1600x1200
-   // 50MHz-> 40.0MHz giving a frame rate of 60.317Hz @  800x600
+   generate
 
-   DCM
-     #(
-       .CLKFX_MULTIPLY   (DCM_M),
-       .CLKFX_DIVIDE     (DCM_D),
-       .CLKIN_PERIOD     (20.000),
-       .CLK_FEEDBACK     ("1X")
-       )
-   DCM1
-     (
-      .CLKIN            (clk50),
-      .CLKFB            (clk0),
-      .RST              (1'b0),
-      .DSSEN            (1'b0),
-      .PSINCDEC         (1'b0),
-      .PSEN             (1'b0),
-      .PSCLK            (1'b0),
-      .CLKFX            (clk_pixel),
-      .CLKFX180         (clk_pixel_n),
-      .CLKDV            (),
-      .CLK2X            (),
-      .CLK2X180         (),
-      .CLK0             (clk0),
-      .CLK90            (),
-      .CLK180           (),
-      .CLK270           (),
-      .LOCKED           (),
-      .PSDONE           (),
-      .STATUS           ()
-      );
+      if (DCM_M2 > 0) begin
+         DCM
+           #(
+             .CLKFX_MULTIPLY   (DCM_M),
+             .CLKFX_DIVIDE     (DCM_D),
+             .CLKIN_PERIOD     (20.000),
+             .CLK_FEEDBACK     ("1X")
+             )
+         DCM1
+           (
+            .CLKIN            (clk50),
+            .CLKFB            (clk0),
+            .RST              (1'b0),
+            .DSSEN            (1'b0),
+            .PSINCDEC         (1'b0),
+            .PSEN             (1'b0),
+            .PSCLK            (1'b0),
+            .CLKFX            (clk1),
+            .CLKFX180         (),
+            .CLKDV            (),
+            .CLK2X            (),
+            .CLK2X180         (),
+            .CLK0             (clk0),
+            .CLK90            (),
+            .CLK180           (),
+            .CLK270           (),
+            .LOCKED           (locked1),
+            .PSDONE           (),
+            .STATUS           ()
+            );
+
+         DCM
+           #(
+             .CLKFX_MULTIPLY   (DCM_M2),
+             .CLKFX_DIVIDE     (DCM_D2),
+             .CLK_FEEDBACK     ("1X")
+             )
+         DCM2
+           (
+            .CLKIN            (clk1),
+            .CLKFB            (clk2),
+            .RST              (!locked1),
+            .DSSEN            (1'b0),
+            .PSINCDEC         (1'b0),
+            .PSEN             (1'b0),
+            .PSCLK            (1'b0),
+            .CLKFX            (clk_pixel),
+            .CLKFX180         (clk_pixel_n),
+            .CLKDV            (),
+            .CLK2X            (),
+            .CLK2X180         (),
+            .CLK0             (clk2),
+            .CLK90            (),
+            .CLK180           (),
+            .CLK270           (),
+            .LOCKED           (),
+            .PSDONE           (),
+            .STATUS           ()
+            );
+
+      end else begin
+
+         DCM
+           #(
+             .CLKFX_MULTIPLY   (DCM_M),
+             .CLKFX_DIVIDE     (DCM_D),
+             .CLKIN_PERIOD     (20.000),
+             .CLK_FEEDBACK     ("1X")
+             )
+         DCM1
+           (
+            .CLKIN            (clk50),
+            .CLKFB            (clk0),
+            .RST              (1'b0),
+            .DSSEN            (1'b0),
+            .PSINCDEC         (1'b0),
+            .PSEN             (1'b0),
+            .PSCLK            (1'b0),
+            .CLKFX            (clk_pixel),
+            .CLKFX180         (clk_pixel_n),
+            .CLKDV            (),
+            .CLK2X            (),
+            .CLK2X180         (),
+            .CLK0             (clk0),
+            .CLK90            (),
+            .CLK180           (),
+            .CLK270           (),
+            .LOCKED           (),
+            .PSDONE           (),
+            .STATUS           ()
+            );
+
+      end
+
+   endgenerate
 
    // =================================================
    // Video Timing
