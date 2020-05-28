@@ -546,10 +546,10 @@ include "constants.asm"
 
 .speed_inc
 {
-        ;; Bits 0-2 are speed
+        ;; Bits 0-3 are speed, allowing upto 16 stages
         LDA reg_speed
-        AND #&07
-        CMP #&07
+        AND #&0F
+        CMP reg_speed_max
         BEQ exit
         INC reg_speed
 .exit
@@ -558,9 +558,9 @@ include "constants.asm"
 
 .speed_dec
 {
-        ;; Bits 0-2 are speed
+        ;; Bits 0-3 are speed, allowing upto 16 stages
         LDA reg_speed
-        AND #&07
+        AND #&0F
         BEQ exit
         DEC reg_speed
 .exit

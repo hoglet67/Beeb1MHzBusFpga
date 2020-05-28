@@ -21,6 +21,7 @@ reg_scaler_y_origin = &FD06
 reg_scaler_zoom     = &FD08
 reg_scaler_x_speed  = &FD09
 reg_scaler_y_speed  = &FD0A
+reg_speed_max       = &FD0B
 reg_magic_lo        = &FD0C
 reg_magic_hi        = &FD0D
 reg_version_min     = &FD0E
