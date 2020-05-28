@@ -1,3 +1,9 @@
+`define VERSION_MAJ 8'h00     // Major version is updated when ever there are incomatible register changes
+`define VERSION_MIN 8'h00     // Minor version is updated when ever there are other changes
+
+`define MAGIC_HI    8'h19     // Used to identify the presence of the hardware
+`define MAGIC_LO    8'h67     // Used to identify the presence of the hardware
+
 //`define VGA_1920_1080
 
 `define VGA_1600_1200
@@ -275,6 +281,10 @@ module life (
 
    // 1MHz Bus
    reg                 selected = 0;
+   reg                 selected_rr = 0;
+   wire                selected_reg = selected && !selected_rr;
+   wire                selected_ram = selected &&  selected_rr;
+
    reg [ASIZE-1:0]     cpu_addr = 0;
    reg [7:0]           cpu_wr_data = 0;
    reg                 cpu_wr_pending = 0;
@@ -967,36 +977,43 @@ module life (
 
    always @(negedge clke or negedge rst_n) begin
       if (!rst_n) begin
-         selected <= 1'b0;
+         selected    <= 1'b0;
+         selected_rr <= 1'b0;
       end else begin
-         if (!pgfc_n && bus_addr == 8'hFE && !rnw)
-           cpu_addr[15:8] <= bus_data;
-         if (!pgfc_n && bus_addr == 8'hA0 && !rnw)
-           control <= bus_data;
-         if (!pgfc_n && bus_addr == 8'hA1 && !rnw)
-           ctrl_stage_enabled <= bus_data[2:0];
-         if (!pgfc_n && bus_addr == 8'hA4 && !rnw)
-           scaler_x_origin[7:0] <= bus_data;
-         if (!pgfc_n && bus_addr == 8'hA5 && !rnw)
-           scaler_x_origin[10+SFB:8] <= bus_data[2+SFB:0];
-         if (!pgfc_n && bus_addr == 8'hA6 && !rnw)
-           scaler_y_origin[7:0] <= bus_data;
-         if (!pgfc_n && bus_addr == 8'hA7 && !rnw)
-           scaler_y_origin[10+SFB:8] <= bus_data[2+SFB:0];
-         if (!pgfc_n && bus_addr == 8'hA8 && !rnw)
-           scaler_zoom <= bus_data[2:0];
-         if (!pgfc_n && bus_addr == 8'hA9 && !rnw)
-           scaler_x_speed <= bus_data;
-         if (!pgfc_n && bus_addr == 8'hAA && !rnw)
-           scaler_y_speed <= bus_data;
+         // Page FC registers
          if (!pgfc_n && bus_addr == 8'hFF && !rnw) begin
-            cpu_addr[ASIZE-1:16] <= bus_data[ASIZE-17:0];
-            if (bus_data[7:3] == 5'b11001)
+            if (bus_data == 8'hC8)
               selected <= 1'b1;
             else
               selected <= 1'b0;
          end
-         if (selected && !pgfd_n && !rnw) begin
+         if (!pgfc_n && selected && bus_addr == 8'hFE && !rnw) begin
+            cpu_addr[ASIZE-1:16] <= bus_data[ASIZE-17:0];
+            selected_rr <= bus_data[7];
+         end
+         if (!pgfc_n && selected && bus_addr == 8'hFD && !rnw) begin
+           cpu_addr[15:8] <= bus_data;
+         end
+         // Page FD registers
+         if (!pgfd_n && selected_reg && bus_addr == 8'h00 && !rnw)
+           control <= bus_data;
+         if (!pgfd_n && selected_reg && bus_addr == 8'h01 && !rnw)
+           ctrl_stage_enabled <= bus_data[2:0];
+         if (!pgfd_n && selected_reg && bus_addr == 8'h04 && !rnw)
+           scaler_x_origin[7:0] <= bus_data;
+         if (!pgfd_n && selected_reg && bus_addr == 8'h05 && !rnw)
+           scaler_x_origin[10+SFB:8] <= bus_data[2+SFB:0];
+         if (!pgfd_n && selected_reg && bus_addr == 8'h06 && !rnw)
+           scaler_y_origin[7:0] <= bus_data;
+         if (!pgfd_n && selected_reg && bus_addr == 8'h07 && !rnw)
+           scaler_y_origin[10+SFB:8] <= bus_data[2+SFB:0];
+         if (!pgfd_n && selected_reg && bus_addr == 8'h08 && !rnw)
+           scaler_zoom <= bus_data[2:0];
+         if (!pgfd_n && selected_reg && bus_addr == 8'h09 && !rnw)
+           scaler_x_speed <= bus_data;
+         if (!pgfd_n && selected_reg && bus_addr == 8'h0A && !rnw)
+           scaler_y_speed <= bus_data;
+         if (selected_ram && !pgfd_n && !rnw) begin
             cpu_wr_pending <= !cpu_wr_pending;
             cpu_wr_data <= bus_data;
          end
@@ -1022,40 +1039,45 @@ module life (
    end
 
    always @(posedge clke) begin
-      if (selected && !pgfd_n)
+      if (selected_ram && !pgfd_n)
         cpu_addr[7:0] <= bus_addr;
-      if (selected && !pgfd_n && rnw)
+      if (selected_ram && !pgfd_n && rnw)
         cpu_rd_pending <= !cpu_rd_pending;
    end
 
-   assign bus_data = (!pgfc_n && bus_addr == 8'hFF && rnw) ? {selected, {(23-ASIZE){1'b0}}, cpu_addr[ASIZE-1:16]}  :
-                     (!pgfc_n && bus_addr == 8'hFE && rnw) ?  cpu_addr[15:8]                       :
-                     (!pgfc_n && bus_addr == 8'hA0 && rnw) ?  control                              :
-                     (!pgfc_n && bus_addr == 8'hA1 && rnw) ?  status                               :
-                     (!pgfc_n && bus_addr == 8'hA2 && rnw) ?  width_div_8                          :
-                     (!pgfc_n && bus_addr == 8'hA3 && rnw) ?  height_div_8                         :
-                     (!pgfc_n && bus_addr == 8'hA4 && rnw) ?  scaler_x_origin[7:0]                 :
-                     (!pgfc_n && bus_addr == 8'hA5 && rnw) ?  scaler_x_origin[10+SFB:8]            :
-                     (!pgfc_n && bus_addr == 8'hA6 && rnw) ?  scaler_y_origin[7:0]                 :
-                     (!pgfc_n && bus_addr == 8'hA7 && rnw) ?  scaler_y_origin[10+SFB:8]            :
-                     (!pgfc_n && bus_addr == 8'hA8 && rnw) ?  scaler_zoom                          :
-                     (!pgfc_n && bus_addr == 8'hA9 && rnw) ?  scaler_x_speed                       :
-                     (!pgfc_n && bus_addr == 8'hAA && rnw) ?  scaler_y_speed                       :
-                     (!pgfc_n && bus_addr == 8'h50 && rnw) ?  gens[7:0]                            :
-                     (!pgfc_n && bus_addr == 8'h51 && rnw) ?  gens[15:8]                           :
-                     (!pgfc_n && bus_addr == 8'h52 && rnw) ?  gens[23:16]                          :
-                     (!pgfc_n && bus_addr == 8'h53 && rnw) ?  gens[31:24]                          :
-                     (!pgfc_n && bus_addr == 8'h54 && rnw) ?  cells[7:0]                           :
-                     (!pgfc_n && bus_addr == 8'h55 && rnw) ?  cells[15:8]                          :
-                     (!pgfc_n && bus_addr == 8'h56 && rnw) ?  cells[23:16]                         :
-                     (!pgfc_n && bus_addr == 8'h57 && rnw) ?  cells[31:24]                         :
-                     (!pgfd_n && selected          && rnw) ?  cpu_rd_data                          :
+   assign bus_data = (!pgfd_n && selected_reg && bus_addr == 8'h00 && rnw) ?  control                              :
+                     (!pgfd_n && selected_reg && bus_addr == 8'h01 && rnw) ?  status                               :
+                     (!pgfd_n && selected_reg && bus_addr == 8'h02 && rnw) ?  width_div_8                          :
+                     (!pgfd_n && selected_reg && bus_addr == 8'h03 && rnw) ?  height_div_8                         :
+                     (!pgfd_n && selected_reg && bus_addr == 8'h04 && rnw) ?  scaler_x_origin[7:0]                 :
+                     (!pgfd_n && selected_reg && bus_addr == 8'h05 && rnw) ?  scaler_x_origin[10+SFB:8]            :
+                     (!pgfd_n && selected_reg && bus_addr == 8'h06 && rnw) ?  scaler_y_origin[7:0]                 :
+                     (!pgfd_n && selected_reg && bus_addr == 8'h07 && rnw) ?  scaler_y_origin[10+SFB:8]            :
+                     (!pgfd_n && selected_reg && bus_addr == 8'h08 && rnw) ?  scaler_zoom                          :
+                     (!pgfd_n && selected_reg && bus_addr == 8'h09 && rnw) ?  scaler_x_speed                       :
+                     (!pgfd_n && selected_reg && bus_addr == 8'h0A && rnw) ?  scaler_y_speed                       :
+                     (!pgfd_n && selected_reg && bus_addr == 8'h0B && rnw) ?  STAGES - 1                           :
+                     (!pgfd_n && selected_reg && bus_addr == 8'h0C && rnw) ?  `MAGIC_LO                            :
+                     (!pgfd_n && selected_reg && bus_addr == 8'h0D && rnw) ?  `MAGIC_HI                            :
+                     (!pgfd_n && selected_reg && bus_addr == 8'h0E && rnw) ?  `VERSION_MIN                         :
+                     (!pgfd_n && selected_reg && bus_addr == 8'h0F && rnw) ?  `VERSION_MAJ                         :
+                     (!pgfd_n && selected_reg && bus_addr == 8'h10 && rnw) ?  gens[7:0]                            :
+                     (!pgfd_n && selected_reg && bus_addr == 8'h11 && rnw) ?  gens[15:8]                           :
+                     (!pgfd_n && selected_reg && bus_addr == 8'h12 && rnw) ?  gens[23:16]                          :
+                     (!pgfd_n && selected_reg && bus_addr == 8'h13 && rnw) ?  gens[31:24]                          :
+                     (!pgfd_n && selected_reg && bus_addr == 8'h14 && rnw) ?  cells[7:0]                           :
+                     (!pgfd_n && selected_reg && bus_addr == 8'h15 && rnw) ?  cells[15:8]                          :
+                     (!pgfd_n && selected_reg && bus_addr == 8'h16 && rnw) ?  cells[23:16]                         :
+                     (!pgfd_n && selected_reg && bus_addr == 8'h17 && rnw) ?  cells[31:24]                         :
+                     (!pgfd_n && selected_ram                      && rnw) ?  cpu_rd_data                          :
                      8'hZZ;
 
    assign bus_data_oel = !(
-                           (clke && !pgfc_n && selected && (bus_addr[7:4] == 4'h5 || bus_addr[7:4] == 4'hA)) ||
-                           (clke && !pgfc_n && !rnw     && (bus_addr == 8'hFE || bus_addr == 8'hFF)) ||
-                           (clke && !pgfd_n && selected));
+                           (clke && !pgfc_n &&             !rnw && (bus_addr == 8'hFF)) ||
+                           (clke && !pgfc_n && selected && !rnw && (bus_addr == 8'hFE)) ||
+                           (clke && !pgfc_n && selected && !rnw && (bus_addr == 8'hFD)) ||
+                           (clke && !pgfd_n && selected_ram) ||
+                           (clke && !pgfd_n && selected_reg));
 
    assign bus_data_dir = rnw;
 
