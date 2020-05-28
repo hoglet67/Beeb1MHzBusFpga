@@ -10,8 +10,13 @@
 .rle_reader
 {
         JSR parse_rle_header
-        JSR offset_pattern
-        JSR calc_fb_limits
+
+        LDA #REGBASE            ; page in the registers
+        STA reg_page_hi
+
+        JSR offset_pattern      ; uses registers
+        JSR calc_fb_limits      ; uses registers
+
         JSR init_yy
         JSR wrap_yy
         JSR init_xx
@@ -47,6 +52,8 @@
         JMP loop
 
 .done
+        LDA #REGBASE            ; page in the registers
+        STA reg_page_hi
         RTS
 
 .digit
@@ -316,6 +323,9 @@
     TXA
     PHA
 
+    LDA #REGBASE            ; page in the registers
+    STA reg_page_hi
+
     LDA reg_x_size
     LDX #yy
     JSR multiply_8_by_16
@@ -344,7 +354,7 @@
 
     LDA accumulator + 2
     AND #&07
-    ORA #BASE
+    ORA #RAMBASE
     STA reg_page_hi
     LDA accumulator + 1
     STA reg_page_lo

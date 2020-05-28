@@ -1,26 +1,39 @@
-BASE                = &C8
+SELECTED            = &C8  ; &FCFF selector value
+REGBASE             = &00  ; &FCFE page for Registers
+RAMBASE             = &80  ; &FCFE base for RAM
+
+MAGIC_LO            = &67
+MAGIC_HI            = &19
+
+VERSION_EXPECTED    = &00
 
 DEFAULT_ZOOM        = 0
 MIN_ZOOM            = 0
 MAX_ZOOM            = 4
 
-reg_control         = &FCA0
-reg_speed           = &FCA1
-reg_status          = &FCA1
-reg_x_size          = &FCA2
-reg_y_size          = &FCA3
-reg_scaler_x_origin = &FCA4
-reg_scaler_y_origin = &FCA6
-reg_scaler_zoom     = &FCA8
-reg_scaler_x_speed  = &FCA9
-reg_scaler_y_speed  = &FCAA
+reg_control         = &FD00
+reg_speed           = &FD01
+reg_status          = &FD01
+reg_x_size          = &FD02
+reg_y_size          = &FD03
+reg_scaler_x_origin = &FD04
+reg_scaler_y_origin = &FD06
+reg_scaler_zoom     = &FD08
+reg_scaler_x_speed  = &FD09
+reg_scaler_y_speed  = &FD0A
+reg_magic_lo        = &FD0C
+reg_magic_hi        = &FD0D
+reg_version_min     = &FD0E
+reg_version_maj     = &FD0F
 
-reg_gens            = &FC50
-reg_cells           = &FC54
+reg_gens            = &FD10
+reg_cells           = &FD14
 
-reg_page_lo     = &FCFE
-reg_page_hi     = &FCFF
+reg_selector    = &FCFF
+reg_page_hi     = &FCFE
+reg_page_lo     = &FCFD
 reg_jim         = &FD00
+
 
 ctrl_running    = &80
 ctrl_mask       = &40

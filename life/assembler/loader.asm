@@ -6,13 +6,57 @@ include "constants.asm"
         LDA #'0'
         STA drive
 
+        ;; Page the Life Engine hardware into &FDxx
+        LDA #SELECTED
+        STA &EE
+        STA reg_selector
+
+        ;; Selected the register page
+        LDA #REGBASE
+        STA reg_page_hi
+
+        ;; Check the hardware is present
+        LDA reg_magic_lo
+        CMP #MAGIC_LO
+        BNE hardware_missing
+        LDA reg_magic_hi
+        CMP #MAGIC_HI
+        BEQ hardware_present
+.hardware_missing
+        JSR print_string
+        EQUS "HD Life FPGA not detected", 10, 13
+        NOP
+        RTS
+
+.hardware_present
+        LDA reg_version_maj
+        CMP #VERSION_EXPECTED
+        BNE hardware_incompatible
+        JMP initialize
+
+.hardware_incompatible
+        JSR print_string
+        EQUS "HD Life FPGA mismatch detected:",10,13
+        EQUS " expected FPGA version = "
+        NOP
+        LDA #VERSION_EXPECTED
+        JSR print_hex2
+        JSR print_string
+        EQUS ".xx", 10, 13, " actual   FPGA version = "
+        NOP
+        LDA reg_version_maj
+        JSR print_hex2
+        LDA #'.'
+        JSR OSWRCH
+        LDA reg_version_min
+        JSR print_hex2
+        JMP OSNEWL
+
+.initialize
         ;; Initialize the control defaukts
         LDA #0
         STA reg_control
         STA reg_speed
-
-        LDA #&C8
-        STA reg_page_hi
 
         ;; Disable the scaler
         JSR reset_scaler

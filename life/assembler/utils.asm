@@ -137,19 +137,33 @@
         EQUD 10000000
 }
 
-
-
-
-
-
-
-
 ;; ************************************************************
-;; Print 16-bit decimal number
+;; Print A as two hex digits
 ;; ************************************************************
 
+.print_hex2
+{
+    PHA
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    JSR hex1
+    PLA
+.hex1
+    AND #&0F
+    CMP #&0A
+    BCC hex2
+    ADC #&06
+.hex2
+    ORA #&30
+    JMP OSWRCH
+}
+
+;; ************************************************************
 ;; 8 bit multiplier in A
 ;; 16-bit muliplicand in zero page X, X+1
+;; ************************************************************
 
 .multiply_8_by_16
 {
