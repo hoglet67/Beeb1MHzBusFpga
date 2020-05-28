@@ -25,6 +25,19 @@
 
 
 ;; ************************************************************
+;; Print Boolean
+;; ************************************************************
+
+.print_boolean
+{
+        CLC
+        ADC #&FF        ; move bit to carry
+        LDA #'0'
+        ADC #0
+        JMP OSWRCH
+}
+
+;; ************************************************************
 ;; Tab to column A
 ;; ************************************************************
 
@@ -80,6 +93,14 @@
         STA num + 1
         STA num + 2
         LDY #8                  ; Offset to powers of ten
+        BNE PrDec
+
+.PrDec4
+        LDA #0
+        STA num + 1
+        STA num + 2
+        LDY #4                  ; Offset to powers of ten
+        BNE PrDec
 
 .PrDec
 {

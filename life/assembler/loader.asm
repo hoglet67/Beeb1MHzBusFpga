@@ -1,5 +1,7 @@
 org &1900
 
+guard &3000
+
 include "constants.asm"
 
 .start
@@ -108,8 +110,27 @@ include "constants.asm"
 {
         JSR print_string
         EQUS 22, 0
-        EQUS "Conway Life for the BBC Micro, using the FPGA Engine ", 10, 10, 13
+        EQUS "Conway's Life on the HD Life FPGA Engine with "
         NOP
+        LDA #0
+        STA pad
+        LDA reg_speed_max
+        CLC
+        ADC #&01
+        STA num
+        JSR PrDec8
+        JSR print_string
+        EQUS " pipeline stages"
+        NOP
+
+        LDA #73
+        JSR tab_to_col
+        JSR print_string
+        EQUS "Drive="
+        NOP
+        LDA drive
+        ORA #'0'
+        JSR OSWRCH
 
         JSR disable_cursor
 
@@ -294,7 +315,8 @@ include "constants.asm"
 ;;           1111111111222222222233333333334444444444555555555566666666667777777777
 ;; 01234567890123456789012345678901234567890123456789012345678901234567890123456789
 
-;; Generation=123456   Cells=123456   X=0000,Y=0000   Zoom=Off   Speed=8x   Drive=2
+;; Conway's Life on the HD Life Engine with 8 pipeline stages               Drive=0
+;; Generation=123456  Cells=123456  X=0000,Y=0000  Zoom=Off  Speed=8x  Msk=0  Brd=1
 
 .disable_cursor
 {
@@ -323,7 +345,7 @@ include "constants.asm"
         JSR PrDec20
 
         JSR print_string
-        EQUS "   Cells="
+        EQUS "  Live="
         NOP
         LDA reg_cells
         STA num
@@ -336,7 +358,7 @@ include "constants.asm"
         JSR PrDec20
 
         JSR print_string
-        EQUS "   X="
+        EQUS "  X="
         NOP
         LDA reg_scaler_x_origin
         STA num
@@ -362,7 +384,7 @@ include "constants.asm"
         JSR PrDec12
 
         JSR print_string
-        EQUS "   Zoom="
+        EQUS "  Zoom="
         NOP
         LDX reg_scaler_zoom
         LDA zoom_table0, X
@@ -373,20 +395,30 @@ include "constants.asm"
         JSR OSWRCH
 
         JSR print_string
-        EQUS "   Speed="
+        EQUS "  Speed="
         NOP
         LDA reg_speed
-        AND #&07
+        AND #&0F
         CLC
-        ADC #&31
-        JSR OSWRCH
+        ADC #&1
+        STA num
+        JSR PrDec4
 
         JSR print_string
-        EQUS "x   Drive="
+        EQUS "x  Msk="
         NOP
-        LDA drive
-        ORA #'0'
-        JMP OSWRCH
+        LDA reg_control
+        AND #ctrl_mask
+        JSR print_boolean
+
+        JSR print_string
+        EQUS "  Bdr="
+        NOP
+        LDA reg_control
+        AND #ctrl_border
+        JSR print_boolean
+
+        RTS
 
 .zoom_table0
         EQUS "O2481"
@@ -395,6 +427,7 @@ include "constants.asm"
 .zoom_table2
         EQUS "f   x"
 }
+
 
 .display_prompt
 {
