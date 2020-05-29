@@ -108,6 +108,15 @@ do
 done
 cp ${build}/loader.log $DIR
 cp working/life.bi[tn] $DIR
+
+# Try to build a /mcs file; this will fail if promgen is not on the path
+
+# Add the default path, this does not preclude other locatyions
+PATH=/opt/Xilinx/14.7/ISE_DS/ISE/bin/lin64:$PATH
+promgen -u 0 working/life.bit -o $DIR/life.mcs -p mcs -w -spi -s 512
+rm -f $DIR/life.prm
+rm -f $DIR/life.cfi
+
 zip -qr $DIR.zip $DIR
 
 echo
