@@ -1,4 +1,4 @@
-`define STAGES          8     // The number of cascaded life pipeline stages
+`define STAGES          1     // The number of cascaded life pipeline stages
 
                               // The max number that will fit is 10. Above 8 stages there are
                               // issues on the vertical boundary because only column is prefetched
@@ -272,56 +272,10 @@ module life (
    reg [7:0]           scaler_x_speed = 0;                 // 6.2 fixed point
    reg [7:0]           scaler_y_speed = 0;                 // 6.2 fixed point
 
-   // Scaler parameters
-   reg [8:0]           scaler_w = 0;
-   reg [9:0]           scaler_h = 0;
-   reg [10:0]          scaler_x_lo_tmp = 0;
-   reg [10:0]          scaler_x_hi_tmp = 0;
-   reg [10:0]          scaler_y_lo_tmp = 0;
-   reg [10:0]          scaler_x_lo = 0;
-   reg [10:0]          scaler_x_hi = 0;
-   reg [10:0]          scaler_y_lo = 0;
-   reg [3:0]           scaler_inc_x_mask = 0;
-   reg [3:0]           scaler_inc_y_mask = 1; // To prevent Xilinx warning
-
-   // Scaler write pipeline
-   reg                 active0 = 0;
-   reg                 active1 = 0;
-   reg                 active2 = 0;
-   reg [9:0]           scaler_y_count0 = 0;
-   reg                 scaler_rst0 = 0;
-   reg                 scaler_rst1 = 0;
-   reg                 scaler_x_in_range0 = 0;
-   reg                 scaler_wr1 = 0;
-   reg                 scaler_wr2 = 0;
-   reg                 scaler_wr3 = 0;
-   reg [1:0]           scaler_bdr0 = 0;
-   reg [1:0]           scaler_bdr1 = 0;
-   reg [1:0]           scaler_bdr2 = 0;
-   reg [1:0]           scaler_odd_din3 = 0;
-   reg [1:0]           scaler_eve_din3 = 0;
-
-   reg [8:0]           scaler_wr_addr_x2 = 0;
-   reg [17:0]          scaler_wr_addr_y2 = 0;
-   reg [17:0]          scaler_wr_addr3 = 0;
-   reg                 scaler_din_last = 0;
-
-   // Scaler RAM
-   reg [1:0]           scaler_ram[0:262143];
-   reg                 scaler_bank = 0;
-
-   // Scaler read pipeline
-   reg [17:0]          scaler_rd_addr_x = 0;
-   reg [17:0]          scaler_rd_addr_y = 0;
-   reg [17:0]          scaler_rd_addr = 0;
-   reg                 scaler_rd_rst_x = 0;
-   reg                 scaler_rd_rst_y = 0;
-   reg                 scaler_rd_inc_x = 0;
-   reg                 scaler_rd_inc_y = 0;
-   reg                 scaler_pix_sel0 = 0;
-   reg                 scaler_pix_sel1 = 0;
-   reg [1:0]           scaler_dout2 = 0;
-   reg                 scaler_dout = 0;
+   // Scaler Video Output
+   wire                scaler_hsync;
+   wire                scaler_vsync;
+   wire                scaler_pixel;
 
    // Life Pipeline
    reg                 life_clken = 0;
@@ -524,261 +478,62 @@ module life (
    always @(posedge clk_pixel) begin
       h_counter <= h_counter_next;
       v_counter <= v_counter_next;
-
-      // Active lags h_counter by one cycle
       active    <= h_counter_next < H_ACTIVE && v_counter_next < V_ACTIVE;
 
       // Skew the video control outputs by VPD clocks to compensate for the video pipeline delay
       // (the other way of doing this would be with pipeline registers)
-      { hsync,  hsync0} <= {hsync0, (h_counter >= H_SYNC_START && h_counter < H_SYNC_END)};
-      { vsync,  vsync0} <= {vsync0, (v_counter >= V_SYNC_START && v_counter < V_SYNC_END)};
-      { blank,  blank0} <= {blank0, (h_counter >= H_ACTIVE || v_counter >= V_ACTIVE)};
-      {border, border0} <= {border0, ((h_counter == 0 || h_counter == H_ACTIVE - 2) && (v_counter < V_ACTIVE)) ||
-                                     ((v_counter == 0 || v_counter == V_ACTIVE - 1) && (h_counter < H_ACTIVE))};
+      if (scaler_zoom != 0) begin
+         hsync <= scaler_hsync;
+         vsync <= scaler_vsync;
+         blank <= 1'b0;
+         border <= 1'b0;
+      end else begin
+         { hsync,  hsync0} <= {hsync0, (h_counter >= H_SYNC_START && h_counter < H_SYNC_END)};
+         { vsync,  vsync0} <= {vsync0, (v_counter >= V_SYNC_START && v_counter < V_SYNC_END)};
+         { blank,  blank0} <= {blank0, (h_counter >= H_ACTIVE || v_counter >= V_ACTIVE)};
+         {border, border0} <= {border0, ((h_counter == 0 || h_counter == H_ACTIVE - 2) && (v_counter < V_ACTIVE)) ||
+                               ((v_counter == 0 || v_counter == V_ACTIVE - 1) && (h_counter < H_ACTIVE))};
+      end
    end
 
+
    // =================================================
-   // Scaler (TODO: make this a seperate module)
+   //  Scaler
    // =================================================
 
+   scaler
+     #(
+       .H_LIFE(H_ACTIVE),
+       .V_LIFE(V_ACTIVE),
+       // Fixed at 800x600 for now
+       .H_ACTIVE(800),
+       .H_SYNC_START(840),
+       .H_SYNC_END(968),
+       .H_TOTAL(1056),
+       .V_ACTIVE(600),
+       .V_SYNC_START(601),
+       .V_SYNC_END(605),
+       .V_TOTAL(628)
+       )
+   scaler0
+     (
+      .clk_in(clk_pixel),
+      .life_d(display_dout[7:6]),
+      .life_active(active),
+      .life_h_counter(h_counter),
+      .life_v_counter(v_counter),
+      .scaler_border(ctrl_border),
+      .scaler_x_origin(scaler_x_origin[10+SFB:SFB]),
+      .scaler_y_origin(scaler_y_origin[10+SFB:SFB]),
+      .scaler_zoom(scaler_zoom),
+      .clk_out(clk_pixel),
+      .clken_out(h_counter[1]),
+      .hsync(scaler_hsync),
+      .vsync(scaler_vsync),
+      .pixel(scaler_pixel)
+      );
 
-   always @(posedge clk_pixel) begin
 
-      // No attempt had been made to control the latency through the scaler
-      // so it's possible that the window will be a few pixels out horizonal in absolute accuracy
-
-      // Example at 1600x1200:
-      // Zoom = 0; window is 1600x1200 pixels (scaler bypassed)
-      // Zoom = 1; window is 800x600 pixels
-      // Zoom = 2; window is 400x300 pixels
-      // Zoom = 3; window is 200x150 pixels
-      // Zoom = 4; window is 100x75 pixels
-
-      // *************************************************************************
-      // *** Parameters (depend only on registers, so are considered fixed)
-      // *************************************************************************
-
-      case (scaler_zoom)
-        3'b100:
-          begin
-             scaler_w <= H_ACTIVE / 32; // units of two-pixels
-             scaler_h <= V_ACTIVE / 16;
-             scaler_inc_x_mask <= 4'b1110;
-             scaler_inc_y_mask <= 4'b1111;
-          end
-        3'b011:
-          begin
-             scaler_w <= H_ACTIVE / 16; // units of two-pixels
-             scaler_h <= V_ACTIVE / 8;
-             scaler_inc_x_mask <= 4'b0110;
-             scaler_inc_y_mask <= 4'b0111;
-          end
-        3'b010:
-          begin
-             scaler_w <= H_ACTIVE / 8;  // units of two-pixels
-             scaler_h <= V_ACTIVE / 4;
-             scaler_inc_x_mask <= 4'b0010;
-             scaler_inc_y_mask <= 4'b0011;
-          end
-        default:
-          begin
-             scaler_w <= H_ACTIVE / 4;  // units of two-pixels
-             scaler_h <= V_ACTIVE / 2;
-             scaler_inc_x_mask <= 4'b0000;
-             scaler_inc_y_mask <= 4'b0001;
-          end
-      endcase
-
-      // Calculate x,y of top left corner (only allow changes when scaler not running)
-      if (scaler_y_count0 == 0) begin
-         // Ignore the fractional bits
-         scaler_x_lo_tmp <= scaler_x_origin[10+SFB:SFB] - scaler_w;
-         scaler_x_hi_tmp <= scaler_x_origin[10+SFB:SFB] + scaler_w;
-         scaler_y_lo_tmp <= scaler_y_origin[10+SFB:SFB] - scaler_h[9:1];
-      end
-
-      // Correct for wrapping
-      if (scaler_x_lo_tmp < H_ACTIVE)
-        scaler_x_lo <= scaler_x_lo_tmp;
-      else
-        scaler_x_lo <= scaler_x_lo_tmp + H_ACTIVE;
-      if (scaler_x_hi_tmp <= H_ACTIVE)
-        scaler_x_hi <= scaler_x_hi_tmp;
-      else
-        scaler_x_hi <= scaler_x_hi_tmp - H_ACTIVE;
-      if (scaler_y_lo_tmp < V_ACTIVE)
-        scaler_y_lo <= scaler_y_lo_tmp;
-      else
-        scaler_y_lo <= scaler_y_lo_tmp + V_ACTIVE;
-
-      // *************************************************************************
-      // *** Write Pipeline stage 0 (only this stage uses h_counter/v_counter and active)
-      // *************************************************************************
-
-      // Double buffer bank selection
-      if (h_counter == 0 && v_counter == 0) begin
-        if (scaler_zoom < 3'b010) begin
-          scaler_bank <= 1'b0;
-        end else begin
-          scaler_bank <= !scaler_bank;
-        end
-      end
-
-      // When to start capturing
-      scaler_rst0 <= 1'b0;
-      if (active) begin
-         if (scaler_x_lo < scaler_x_hi) begin
-            // The window doesn't cross the L/R boundary
-            if (h_counter == {1'b0, scaler_x_lo[10:1], 1'b0}) begin
-               if (v_counter == scaler_y_lo) begin
-                  scaler_rst0 <= 1'b1;
-                  scaler_y_count0 <= scaler_h;
-               end else if (|scaler_y_count0) begin
-                  scaler_y_count0 <= scaler_y_count0 - 1'b1;
-               end
-            end
-         end else begin
-            if (h_counter == 0) begin
-               if (v_counter == scaler_y_lo) begin
-                  scaler_rst0 <= 1'b1;
-                  scaler_y_count0 <= scaler_h;
-               end else if (|scaler_y_count0) begin
-                  scaler_y_count0 <= scaler_y_count0 - 1'b1;
-               end
-            end
-         end
-      end
-
-      if (scaler_x_lo < scaler_x_hi) begin
-         scaler_x_in_range0 <= (h_counter >= {1'b0, scaler_x_lo[10:1], 1'b0}) && (h_counter < {1'b0, scaler_x_hi[10:1], 1'b0});
-      end else begin
-         scaler_x_in_range0 <= (h_counter >= {1'b0, scaler_x_lo[10:1], 1'b0}) || (h_counter < {1'b0, scaler_x_hi[10:1], 1'b0});
-      end
-
-      scaler_bdr0 <= (v_counter == 0 || v_counter == V_ACTIVE - 1) ? {2{ctrl_border}} : 2'b00;
-      active0     <= active;
-
-      // *************************************************************************
-      // *** Write Pipeline stage 1, uses outputs of stage 0
-      // *************************************************************************
-
-      scaler_wr1  <= scaler_x_in_range0 && |scaler_y_count0 && active0;
-      scaler_rst1 <= scaler_rst0;
-      scaler_bdr1 <= scaler_bdr0;
-      active1     <= active0;
-
-      // *************************************************************************
-      // *** Write Pipeline stage 2, uses outputs of stage 1
-      // *************************************************************************
-
-      // Scaler write address
-      if (scaler_x_lo < scaler_x_hi) begin
-         // The window doesn't cross the L/R boundary
-         if (scaler_rst1) begin
-            scaler_wr_addr_x2 <= 0;
-            scaler_wr_addr_y2 <= {scaler_bank, 17'b0};
-         end else if (scaler_wr1) begin
-            if (scaler_wr_addr_x2 >= scaler_w - 1'b1) begin
-               scaler_wr_addr_x2 <= 0;
-            end else begin
-               scaler_wr_addr_x2 <= scaler_wr_addr_x2 + 1'b1;
-            end
-            if (scaler_wr_addr_x2 + 1'b1 == scaler_w) begin
-               scaler_wr_addr_y2 <= scaler_wr_addr_y2 + scaler_w;
-            end
-         end
-      end else begin
-         // The window crosses the L/R boundary
-         if (scaler_rst1) begin
-            scaler_wr_addr_x2 <= scaler_w - scaler_x_hi[9:1];
-            scaler_wr_addr_y2 <= {scaler_bank, 17'b0};
-         end else if (scaler_wr1) begin
-            if (scaler_wr_addr_x2 >= scaler_w - 1'b1) begin
-               scaler_wr_addr_x2 <= 0;
-            end else begin
-               scaler_wr_addr_x2 <= scaler_wr_addr_x2 + 1'b1;
-            end
-            if (scaler_wr_addr_x2 + 1'b1 == scaler_w - scaler_x_hi[10:1]) begin
-               scaler_wr_addr_y2 <= scaler_wr_addr_y2 + scaler_w;
-            end
-         end
-      end
-
-      // Add in the the L/R boundart
-      if (scaler_x_lo[0]) begin
-         if (active1 && !active2)
-           scaler_bdr2 <= scaler_bdr1 | {ctrl_border, 1'b0};
-         else if (active1 && !active0)
-           scaler_bdr2 <= scaler_bdr1 | {1'b0, ctrl_border};
-         else
-           scaler_bdr2 <= scaler_bdr1;
-      end else begin
-         if (active1 && !active2)
-           scaler_bdr2 <= scaler_bdr1 | {2{ctrl_border}};
-         else
-           scaler_bdr2 <= scaler_bdr1;
-      end
-
-      scaler_wr2  <= scaler_wr1;
-      active2     <= active1;
-
-      // *************************************************************************
-      // *** Write Pipeline stage 3, uses outputs of stage 2
-      // *************************************************************************
-
-      // Capture the right pixel in the previous sample. This happens to work correctly
-      // even at the wrap point, because extras reads of the last/first columns are
-      // inserted before/after the active line so the life engine works properly.
-      scaler_din_last <= display_dout[6];
-
-      // At odd pixel offets, the two output pixels need to be taken from adjacent samples
-      scaler_odd_din3 <= {scaler_din_last, display_dout[7]} | scaler_bdr2;
-
-      // At even pixel offsets, the two output pixels in the display sample are correctly aligned
-      scaler_eve_din3 <= display_dout[7:6] | scaler_bdr2;
-
-      scaler_wr_addr3 <= scaler_wr_addr_y2 + scaler_wr_addr_x2;
-      scaler_wr3      <= scaler_wr2;
-
-      // *************************************************************************
-      // *** Scaler RAM Write
-      // *************************************************************************
-      if (scaler_wr3)
-        scaler_ram[scaler_wr_addr3] <= scaler_x_lo[0] ? scaler_eve_din3 : scaler_odd_din3;
-
-      // When to reset the scaler rd address
-      scaler_rd_rst_x <= h_counter == H_ACTIVE;
-      scaler_rd_rst_y <= v_counter == V_TOTAL - 1;
-
-      // When to increment the scaler rd addess
-      scaler_rd_inc_x <= ((h_counter[3:0] & scaler_inc_x_mask) == scaler_inc_x_mask) && active;
-      scaler_rd_inc_y <= ((v_counter[3:0] & scaler_inc_y_mask) == scaler_inc_y_mask) && h_counter == H_ACTIVE;
-
-      // X component of scaler read address (bit 0 of this selects the one of the pixel pair)
-      if (scaler_rd_rst_x)
-        scaler_rd_addr_x <= 0;
-      else if (scaler_rd_inc_x)
-        scaler_rd_addr_x <= scaler_rd_addr_x + 1'b1;
-
-      // Y component of scaler read address
-      // (this happens at the end of the frame, so bank is the bank that has just been written)
-      if (scaler_rd_rst_y)
-        scaler_rd_addr_y <= {scaler_bank, 17'h00000};
-      else if (scaler_rd_inc_y)
-        scaler_rd_addr_y <= scaler_rd_addr_y + scaler_w;
-
-      // Scaler read address
-      scaler_rd_addr  <= scaler_rd_addr_x[17:1] + scaler_rd_addr_y;
-      scaler_pix_sel0 <= scaler_rd_addr_x[0];
-
-      // Scaler read
-      scaler_dout2    <= scaler_ram[scaler_rd_addr];
-      scaler_pix_sel1 <= scaler_pix_sel0;
-
-      // Output of the scaler is a single pixel
-      scaler_dout <= scaler_pix_sel1 ? scaler_dout2[0] : scaler_dout2[1];
-
-   end
 
    // =================================================
    // Pixel Output
@@ -787,7 +542,7 @@ module life (
    wire rescale = |scaler_zoom;
 
    always @(negedge clk_pixel) begin
-      if ((!blank) && (rescale ? scaler_dout : display_dout[7])) begin
+      if ((!blank) && (rescale ? scaler_pixel : display_dout[7])) begin
          rgb1 <= 12'hFFF;
       end else if (border) begin
          if (ctrl_mask)
@@ -797,7 +552,7 @@ module life (
       end else begin
          rgb1 <= 12'h000;
       end
-      if ((!blank) && (rescale ? scaler_dout : display_dout[6])) begin
+      if ((!blank) && (rescale ? scaler_pixel : display_dout[6])) begin
          rgb0 <= 12'hFFF;
       end else if (border) begin
          if (ctrl_mask)
