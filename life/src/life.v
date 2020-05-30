@@ -10,15 +10,31 @@
 `define MAGIC_LO    8'h67     // Used to identify the presence of the hardware
 
 
-//`define VGA_1920_1080
-
-`define VGA_1600_1200
-
-//`define VGA_1280_1024
-
-//`define VGA_1024_768
 
 //`define VGA_800_600
+//`define VGA_1024_768
+//`define VGA_1280_720
+//`define VGA_1280_768
+//`define VGA_1280_1024
+//`define VGA_1600_1200
+//`define VGA_1920_1080
+
+// Default to 1600x1200 if nothing already specified
+`ifndef VGA_800_600
+ `ifndef VGA_1024_768
+  `ifndef VGA_1280_720
+   `ifndef VGA_1280_768
+    `ifndef VGA_1280_1024
+     `ifndef VGA_1600_1200
+      `ifndef VGA_1920_1080
+       `define VGA_1600_1200
+      `endif
+     `endif
+    `endif
+   `endif
+  `endif
+ `endif
+`endif
 
 module life (
              // System oscillator
@@ -35,11 +51,6 @@ module life (
              bus_data_oel,
              nmi,
              irq,
-             // SPI DAC
-             dac_cs_n,
-             dac_sck,
-             dac_sdi,
-             dac_ldac_n,
              // RAM
              ram_addr,
              ram_data,
@@ -69,11 +80,6 @@ module life (
    output            bus_data_oel;
    output            nmi;
    output            irq;
-   // SPI DAC
-   output            dac_cs_n;
-   output            dac_sck;
-   output            dac_sdi;
-   output            dac_ldac_n;
    // RAM
    output reg [18:0] ram_addr;
    inout [7:0]       ram_data;
@@ -83,120 +89,12 @@ module life (
    // Misc
    output [7:0]      pmod0;
    output [7:0]      pmod1;
-   output [3:0]      pmod2;
+   inout  [7:0]      pmod2;
    input             sw1;
    input             sw2;
    output            led;
 
-`ifdef VGA_1920_1080
-
-   // H_TOTAL = 2200
-   localparam H_ACTIVE      = 11'd1920;
-   localparam H_SYNC_START  = H_ACTIVE + 88;
-   localparam H_SYNC_END    = H_SYNC_START + 44;
-   localparam H_TOTAL       = H_SYNC_END + 148;
-
-   // V_TOTAL = 1125
-   localparam V_ACTIVE      = 11'd1080;
-   localparam V_SYNC_START  = V_ACTIVE + 4;
-   localparam V_SYNC_END    = V_SYNC_START + 5;
-   localparam V_TOTAL       = V_SYNC_END + 36;
-
-   // DCM = 75MHz
-   localparam DCM_M         = 3;
-   localparam DCM_D         = 2;
-   localparam DCM_M2        = 0;
-   localparam DCM_D2        = 0;
-
-`endif
-
-`ifdef VGA_1600_1200
-
-   // H_TOTAL = 2160
-   localparam H_ACTIVE      = 11'd1600;
-   localparam H_SYNC_START  = H_ACTIVE + 64;
-   localparam H_SYNC_END    = H_SYNC_START + 192;
-   localparam H_TOTAL       = H_SYNC_END + 304;
-
-   // V_TOTAL = 1250
-   localparam V_ACTIVE      = 11'd1200;
-   localparam V_SYNC_START  = V_ACTIVE + 1;
-   localparam V_SYNC_END    = V_SYNC_START + 3;
-   localparam V_TOTAL       = V_SYNC_END + 46;
-
-   // DCM = 81MHz
-   localparam DCM_M         = 9;
-   localparam DCM_D         = 5;
-   localparam DCM_M2        = 9;
-   localparam DCM_D2        = 10;
-
-`endif
-
-`ifdef VGA_1280_1024
-
-   // H_TOTAL = 1666
-   localparam H_ACTIVE      = 11'd1280;
-   localparam H_SYNC_START  = H_ACTIVE + 48;
-   localparam H_SYNC_END    = H_SYNC_START + 112;
-   localparam H_TOTAL       = H_SYNC_END + 248;
-
-   // V_TOTAL = 1066
-   localparam V_ACTIVE      = 11'd1024;
-   localparam V_SYNC_START  = V_ACTIVE + 1;
-   localparam V_SYNC_END    = V_SYNC_START + 3;
-   localparam V_TOTAL       = V_SYNC_END + 38;
-
-   // DCM - 54MHz
-   localparam DCM_M         = 27;
-   localparam DCM_D         = 25;
-   localparam DCM_M2        = 0;
-   localparam DCM_D2        = 0;
-
-`endif
-
-`ifdef VGA_1024_768
-
-   // H_TOTAL = 1344
-   localparam H_ACTIVE      = 11'd1024;
-   localparam H_SYNC_START  = H_ACTIVE + 24;
-   localparam H_SYNC_END    = H_SYNC_START + 136;
-   localparam H_TOTAL       = H_SYNC_END + 160;
-
-   // V_TOTAL = 806
-   localparam V_ACTIVE      = 10'd600;
-   localparam V_SYNC_START  = V_ACTIVE + 3;
-   localparam V_SYNC_END    = V_SYNC_START + 6;
-   localparam V_TOTAL       = V_SYNC_END + 29;
-
-   // DCM - 32.5MHz
-   localparam DCM_M         = 13;
-   localparam DCM_D         = 20;
-   localparam DCM_M2        = 0;
-   localparam DCM_D2        = 0;
-
-`endif
-
-`ifdef VGA_800_600
-
-   // H_TOTAL = 1056
-   localparam H_ACTIVE      = 11'd800;
-   localparam H_SYNC_START  = H_ACTIVE + 40;
-   localparam H_SYNC_END    = H_SYNC_START + 128;
-   localparam H_TOTAL       = H_SYNC_END + 88;
-
-   // V_TOTAL = 628
-   localparam V_ACTIVE      = 10'd600;
-   localparam V_SYNC_START  = V_ACTIVE + 1;
-   localparam V_SYNC_END    = V_SYNC_START + 4;
-   localparam V_TOTAL       = V_SYNC_END + 23;
-
-   // DCM - 20MHz
-   localparam DCM_M         = 4;
-   localparam DCM_D         = 10;
-   localparam DCM_M2        = 0;
-   localparam DCM_D2        = 0;
-
-`endif
+`include "resolutions.v"
 
    // Number of cascaded life pipeline stages
    localparam STAGES        = `STAGES;
@@ -1221,14 +1119,10 @@ module life (
 
    assign pmod0        = {blue , red};
    assign pmod1        = {2'b00, vsync, hsync, green};
-   assign pmod2        = 4'b1111;
+   assign pmod2[7:4]   = 4'h0;
+   assign pmod2[3:0]   = 4'hZ;
 
    assign led          = sw1 | sw2;
-
-   assign dac_cs_n     = 1'b1;
-   assign dac_sck      = 1'b1;
-   assign dac_sdi      = 1'b1;
-   assign dac_ldac_n   = 1'b1;
 
 endmodule
 

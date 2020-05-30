@@ -5,22 +5,6 @@
 # 1. BeebASM - https://github.com/stardot/beebasm
 # 2. MMB/SSD Utils in Perl - https://github.com/sweharris/MMB_Utils
 
-if [ -z "$1" ]; then
-    BUILD=$(date +"%Y%m%d_%H%M")
-else
-    BUILD=$1
-fi
-
-
-NAME=beeb_fpga_life_$BUILD
-
-DIR=releases/$NAME
-
-echo "Release name: $NAME"
-
-rm -rf $DIR
-mkdir -p $DIR
-
 build=build
 
 rm -rf ${build}
@@ -98,26 +82,5 @@ beeb putfile ${build}/${ssd}0.ssd ${build}/\!BOOT
 # Make bootable
 beeb opt4 ${build}/${ssd}0.ssd 3
 
-
-# Zip Everything Up
-for i in 0 1 2 3
-do
-    # List the disk
-    beeb info ${build}/${ssd}${i}.ssd
-    cp ${build}/${ssd}${i}.ssd $DIR
-done
-cp ${build}/loader.log $DIR
-cp working/life.bi[tn] $DIR
-
-# Try to build a /mcs file; this will fail if promgen is not on the path
-
-# Add the default path, this does not preclude other locatyions
-PATH=/opt/Xilinx/14.7/ISE_DS/ISE/bin/lin64:$PATH
-promgen -u 0 working/life.bit -o $DIR/life.mcs -p mcs -w -spi -s 512
-rm -f $DIR/life.prm
-rm -f $DIR/life.cfi
-
-zip -qr $DIR.zip $DIR
-
-echo
-unzip -l $DIR.zip
+# Show the names of the .ssd files
+ls -l ${build}/*.ssd ${build}/*.log
