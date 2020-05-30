@@ -115,17 +115,32 @@ include "constants.asm"
 {
         JSR print_string
         EQUS 22, 0
-        EQUS "Conway's Life on the HD Life FPGA Engine with "
+        EQUS "Conway's Life on the HD Life FPGA at "
         NOP
+        LDA reg_x_size
+        JSR multiply_by_8
         LDA #0
         STA pad
+        JSR PrDec16
+        LDA #'x'
+        JSR OSWRCH
+        LDA reg_y_size
+        JSR multiply_by_8
+        LDA #0
+        STA pad
+        JSR PrDec16
+        JSR print_string
+        EQUS " with "
+        NOP
         LDA reg_speed_max
         CLC
         ADC #&01
         STA num
+        LDA #0
+        STA pad
         JSR PrDec8
         JSR print_string
-        EQUS " pipeline stages"
+        EQUS " Pipeline Stages"
         NOP
 
         LDA #73
@@ -337,8 +352,6 @@ include "constants.asm"
 
 .update_counts
 {
-        LDA #'0'
-        STA pad
 
         LDA #31
         JSR OSWRCH
@@ -379,8 +392,6 @@ include "constants.asm"
 
 .display_status
 {
-        LDA #'0'
-        STA pad
 
         JSR print_string
         EQUS 31,  0, 2, "Generation="
