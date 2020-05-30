@@ -1,15 +1,14 @@
-`define STAGES          8     // The number of cascaded life pipeline stages
-
-                              // The max number that will fit is 10. Above 8 stages there are
-                              // issues on the vertical boundary because only column is prefetched
+// The number of cascaded life pipeline stages. Above 8 stages there
+// are issues on the vertical boundary because only column is prefetched
+`ifndef STAGES
+ `define STAGES          8
+`endif
 
 `define VERSION_MAJ 8'h00     // Major version is updated when ever there are incompatible register changes
 `define VERSION_MIN 8'h00     // Minor version is updated when ever there are other changes
 
 `define MAGIC_HI    8'h19     // Used to identify the presence of the hardware
 `define MAGIC_LO    8'h67     // Used to identify the presence of the hardware
-
-
 
 //`define VGA_800_600
 //`define VGA_1024_768

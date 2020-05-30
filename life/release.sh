@@ -46,7 +46,14 @@ do
 echo "Building $i"
 
 mkdir -p working/$i
-cat life.xise | sed "s#working#working/$i#" | sed "s#VGA_XXX_XXX#VGA_$i#" > life_tmp.xise
+
+if [ "$i" == "1920_1080" ]; then
+    s=6
+else
+    s=8
+fi
+
+cat life.xise | sed "s#working#working/$i#" | sed "s#VGA_XXX_XXX#VGA_$i STAGES=$s#" > life_tmp.xise
 
 if [ ! -f working/$i/life.bit ]; then
 xtclsh > working/$i.log 2>&1 <<EOF
