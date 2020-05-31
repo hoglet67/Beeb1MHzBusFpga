@@ -40,14 +40,15 @@ for i in \
         1280_768 \
         1280_1024 \
         1600_1200 \
-        1920_1080
+        1920_1080 \
+        1920_1200
 do
 
 echo "Building $i"
 
 mkdir -p working/$i
 
-if [ "$i" == "1920_1080" ]; then
+if [[ "$i" == "1920_1080" || "$i" == "1920_1200" ]]; then
     s=6
 else
     s=8
@@ -120,6 +121,7 @@ promgen                                          \
  -u 1A4000 working/1280_720/life.bit             \
  -u 1F8000 working/1024_768/life.bit             \
  -u 24C000 working/800_600/life.bit              \
+ -u 2A0000 working/1920_1200/life.bit            \
  -o working/multiboot/multiboot.mcs  -p mcs -w -spi -s 4096
 
 cp working/multiboot/multiboot.mcs $DIR

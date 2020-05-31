@@ -17,6 +17,7 @@
 //`define VGA_1280_1024
 //`define VGA_1600_1200
 //`define VGA_1920_1080
+//`define VGA_1920_1200
 
 // Default to 1600x1200 if nothing already specified
 `ifndef VGA_800_600
@@ -26,7 +27,9 @@
     `ifndef VGA_1280_1024
      `ifndef VGA_1600_1200
       `ifndef VGA_1920_1080
-       `define VGA_1600_1200
+       `ifndef VGA_1920_1200
+        `define VGA_1600_1200
+       `endif
       `endif
      `endif
     `endif
@@ -1125,7 +1128,7 @@ module life (
    assign nmi          = 1'b0;
 
    assign pmod0        = {blue , red};
-   assign pmod1        = {2'b00, vsync, hsync, green};
+   assign pmod1        = {2'b00, vsync ^ V_POL, hsync ^ H_POL, green};
    assign pmod2[7:4]   = 4'h0;
    assign pmod2[3:0]   = 4'hZ;
 
