@@ -99,7 +99,7 @@ module life (
    localparam STAGES        = `STAGES;
 
    // Numver of address bits used for playfield pointers
-   localparam ASIZE         = 18;
+   localparam ASIZE         = 19;
 
    // Number of rows in life playfield
    localparam NR            = V_ACTIVE;
@@ -290,6 +290,14 @@ module life (
 
    function [ASIZE-1:0] truncate_address(input [ASIZE:0] addr);
       truncate_address = addr[ASIZE-1:0];
+   endfunction
+
+   function [ASIZE-1:0] double_buffer_address(input bank, input [ASIZE-1:0] addr);
+      // double buffer the first 1/16th of the RAM
+      if (addr[ASIZE-1:ASIZE-4] == 0)
+        double_buffer_address = {{4{bank}}, addr[ASIZE-5:0]};
+      else
+        double_buffer_address = addr;
    endfunction
 
    function [3:0] count_live_cells(input [7:0] d);
@@ -862,7 +870,7 @@ module life (
             ram_cel  <= 1'b0;
             ram_oel  <= 1'b0;
             write_n  <= 1'b1;
-            ram_addr <= {life_bank, life_rd_addr};
+            ram_addr <= double_buffer_address(life_bank, life_rd_addr);
          end else begin
             // Idle Cycle
             ram_cel  <= 1'b1;
@@ -926,14 +934,14 @@ module life (
             // Start Life Engine Write Cyle
             ram_cel  <= 1'b0;
             ram_oel  <= 1'b1;
-            ram_addr <= {!life_bank, life_wr_addr};
+            ram_addr <= double_buffer_address(!life_bank, life_wr_addr);
             ram_din  <= ctrl_clear ? clear_wr_data : (life_wr_data & mask);
             write_n  <= 1'b0;
          end else if (cpu_rd_pending2 != cpu_rd_pending1) begin
             // Start Beeb Read Cyle
             ram_cel  <= 1'b0;
             ram_oel  <= 1'b0;
-            ram_addr <= {life_bank, cpu_addr};
+            ram_addr <= double_buffer_address(life_bank, cpu_addr);
             write_n  <= 1'b1;
             cpu_rd_pending2 <= cpu_rd_pending1;
             beeb_rd  <= 1'b1; // delay reading of beeb data a cycle
@@ -941,7 +949,7 @@ module life (
             // Start Beeb Write Cyle
             ram_cel  <= 1'b0;
             ram_oel  <= 1'b1;
-            ram_addr <= {life_bank, cpu_addr};
+            ram_addr <= double_buffer_address(life_bank, cpu_addr);
             ram_din  <= cpu_wr_data;
             write_n  <= 1'b0;
             cpu_wr_pending2 <= cpu_wr_pending1;
