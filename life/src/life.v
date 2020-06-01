@@ -129,6 +129,9 @@ module life (
    localparam H_ACTIVE_FP   = {H_ACTIVE, {SFB{1'b0}}};
    localparam V_ACTIVE_FP   = {V_ACTIVE, {SFB{1'b0}}};
 
+   // Size of the BRAM used for the scaler (in units of 2 pixels)
+   localparam BRAM_SIZE     = 262144;
+
    // Clocks
    wire                clk0;
    wire                clk1;
@@ -183,6 +186,7 @@ module life (
    reg [11:0]          scaler_y_lo = 0;
    reg [3:0]           scaler_inc_x_mask = 0;
    reg [3:0]           scaler_inc_y_mask = 1; // To prevent Xilinx warning
+   reg [10:0]          scaler_y_offset = 0;
 
    // Scaler write pipeline
    reg                 active0 = 0;
@@ -207,7 +211,7 @@ module life (
    reg                 scaler_din_last = 0;
 
    // Scaler RAM
-   reg [1:0]           scaler_ram[0:262143];
+   reg [1:0]           scaler_ram[0:BRAM_SIZE - 1];
    reg                 scaler_bank = 0;
 
    // Scaler read pipeline
@@ -218,6 +222,7 @@ module life (
    reg                 scaler_rd_rst_y = 0;
    reg                 scaler_rd_inc_x = 0;
    reg                 scaler_rd_inc_y = 0;
+   reg                 scaler_rd_active = 0;
    reg                 scaler_pix_sel0 = 0;
    reg                 scaler_pix_sel1 = 0;
    reg [1:0]           scaler_dout2 = 0;
@@ -473,6 +478,7 @@ module life (
              scaler_h <= V_ACTIVE / 16;
              scaler_inc_x_mask <= 4'b1110;
              scaler_inc_y_mask <= 4'b1111;
+             scaler_y_offset   <= 0;
           end
         3'b011:
           begin
@@ -480,6 +486,7 @@ module life (
              scaler_h <= V_ACTIVE / 8;
              scaler_inc_x_mask <= 4'b0110;
              scaler_inc_y_mask <= 4'b0111;
+             scaler_y_offset   <= 0;
           end
         3'b010:
           begin
@@ -487,13 +494,21 @@ module life (
              scaler_h <= V_ACTIVE / 4;
              scaler_inc_x_mask <= 4'b0010;
              scaler_inc_y_mask <= 4'b0011;
+             scaler_y_offset   <= 0;
           end
         default:
           begin
              scaler_w <= H_ACTIVE / 4;  // units of two-pixels
-             scaler_h <= V_ACTIVE / 2;
              scaler_inc_x_mask <= 4'b0000;
              scaler_inc_y_mask <= 4'b0001;
+             // At 1920x1200 this we need to reduce the number of active lines as there is insufficient RAM
+             if (V_ACTIVE * H_ACTIVE / 8 < BRAM_SIZE) begin
+               scaler_h <= V_ACTIVE / 2;
+               scaler_y_offset <= 0;
+             end else begin
+               scaler_h <= BRAM_SIZE / (H_ACTIVE / 4);                          // 546 (rather than 600)
+               scaler_y_offset <= (V_ACTIVE / 2) - BRAM_SIZE / (H_ACTIVE / 4);  // 54
+             end
           end
       endcase
 
@@ -654,9 +669,13 @@ module life (
       if (scaler_wr3)
         scaler_ram[scaler_wr_addr3] <= scaler_x_lo[0] ? scaler_eve_din3 : scaler_odd_din3;
 
+      // *************************************************************************
+      // *** Scaler Read Pipelie
+      // *************************************************************************
+
       // When to reset the scaler rd address
       scaler_rd_rst_x <= h_counter == H_ACTIVE;
-      scaler_rd_rst_y <= v_counter == V_TOTAL - 1;
+      scaler_rd_rst_y <= v_counter == (scaler_y_offset > 0 ? scaler_y_offset - 1 : V_TOTAL - 1);
 
       // When to increment the scaler rd addess
       scaler_rd_inc_x <= ((h_counter[3:0] & scaler_inc_x_mask) == scaler_inc_x_mask) && active;
@@ -683,8 +702,12 @@ module life (
       scaler_dout2    <= scaler_ram[scaler_rd_addr];
       scaler_pix_sel1 <= scaler_pix_sel0;
 
-      // Output of the scaler is a single pixel
-      scaler_dout <= scaler_pix_sel1 ? scaler_dout2[0] : scaler_dout2[1];
+      if (v_counter >= scaler_y_offset && v_counter < V_ACTIVE - scaler_y_offset)
+        // Output of the scaler is a single pixel
+        scaler_dout <= scaler_pix_sel1 ? scaler_dout2[0] : scaler_dout2[1];
+      else
+        // If the view is truncated vertically, mask on inactive lines
+        scaler_dout <= 1'b0;
 
    end
 
