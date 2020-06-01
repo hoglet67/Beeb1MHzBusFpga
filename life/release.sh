@@ -112,6 +112,9 @@ fi
 # -u 248000 working/spare/life.bit               \
 # -u 39C000 working/spare/life.bit               \
 
+for type in mcs bin
+do
+
 promgen                                          \
  -u      0 working/multiboot/MultiBootLoader.bit \
  -u  54000 working/1920_1080/life.bit            \
@@ -122,9 +125,11 @@ promgen                                          \
  -u 1F8000 working/1024_768/life.bit             \
  -u 24C000 working/800_600/life.bit              \
  -u 2A0000 working/1920_1200/life.bit            \
- -o working/multiboot/multiboot.mcs  -p mcs -w -spi -s 4096
+ -o working/multiboot/multiboot.mcs  -p ${type} -w -spi -s 4096
 
-cp working/multiboot/multiboot.mcs $DIR
+cp working/multiboot/multiboot.${type} $DIR
+
+done
 
 # Zip everything up
 cd releases
