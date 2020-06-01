@@ -807,7 +807,7 @@ module life (
       //
 
       // Life memory reads are active for NC+2 cols and NR+2 rows compared to the video; pipeline now clocked on this as well
-      life_rd_active <= (h_counter_next[11:3] < (NC + LPD * STAGES) || h_counter_next[11:3] == (TC - 1)) && (v_counter_next < (NR + STAGES) || v_counter_next > (TR - 1 - STAGES));
+      life_rd_active <= (h_counter_next[11:3] < (NC + LPD * STAGES) || h_counter_next[11:3] == (TC - 1)) && (v_counter_next < (NR + STAGES) || v_counter_next > (TR - 2 - STAGES));
 
       // Life memory writes are active for NC cols and NR rows, but skewed by a couple of cycles
       life_wr_active <= (h_counter_next[11:3] >= (LPD * STAGES)) && (h_counter_next[11:3] < (NC + LPD * STAGES)) && (v_counter_next >= STAGES) && (v_counter_next < (NR + STAGES));
@@ -823,8 +823,8 @@ module life (
            life_col_addr <= life_col_addr + 1'b1;
          // Generate the row part of the address
          if (h_counter[11:3] == TC - 2)
-           if (v_counter == TR - 1 - STAGES)
-             life_row_addr <= (NR - STAGES) * NC;
+           if (v_counter == TR - 2 - STAGES)
+             life_row_addr <= (NR - STAGES - 1) * NC;
            else if (life_row_addr == (NR - 1) * NC)
              life_row_addr <= 0;
            else
