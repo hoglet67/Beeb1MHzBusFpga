@@ -175,12 +175,12 @@ module life (
    // Scaler parameters
    reg [8:0]           scaler_w = 0;
    reg [9:0]           scaler_h = 0;
-   reg [10:0]          scaler_x_lo_tmp = 0;
-   reg [10:0]          scaler_x_hi_tmp = 0;
-   reg [10:0]          scaler_y_lo_tmp = 0;
-   reg [10:0]          scaler_x_lo = 0;
-   reg [10:0]          scaler_x_hi = 0;
-   reg [10:0]          scaler_y_lo = 0;
+   reg [11:0]          scaler_x_lo_tmp = 0;
+   reg [11:0]          scaler_x_hi_tmp = 0;
+   reg [11:0]          scaler_y_lo_tmp = 0;
+   reg [11:0]          scaler_x_lo = 0;
+   reg [11:0]          scaler_x_hi = 0;
+   reg [11:0]          scaler_y_lo = 0;
    reg [3:0]           scaler_inc_x_mask = 0;
    reg [3:0]           scaler_inc_y_mask = 1; // To prevent Xilinx warning
 
@@ -538,7 +538,7 @@ module life (
          if (scaler_x_lo < scaler_x_hi) begin
             // The window doesn't cross the L/R boundary
             if (h_counter == {1'b0, scaler_x_lo[10:1], 1'b0}) begin
-               if (v_counter == scaler_y_lo) begin
+               if (v_counter == scaler_y_lo[10:0]) begin
                   scaler_rst0 <= 1'b1;
                   scaler_y_count0 <= scaler_h;
                end else if (|scaler_y_count0) begin
@@ -547,7 +547,7 @@ module life (
             end
          end else begin
             if (h_counter == 0) begin
-               if (v_counter == scaler_y_lo) begin
+               if (v_counter == scaler_y_lo[10:0]) begin
                   scaler_rst0 <= 1'b1;
                   scaler_y_count0 <= scaler_h;
                end else if (|scaler_y_count0) begin
