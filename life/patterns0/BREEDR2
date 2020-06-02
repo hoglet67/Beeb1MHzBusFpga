@@ -1,0 +1,25 @@
+#N Breeder 2
+#O Dean Hickerson
+#C Smallest Breeder ever created
+x = 102, y = 128, rule = B3/S23
+27b2o$25b2ob2o13b2o$25b4o13b4o$26b2o14b2ob2o$44b2o$19bo$20b2o$19b2o$41b
+2o$36b2o3bobo$36bo4bob2o$42b2o$42bo2$3b2o$3ob2o37b2o$5o29b4o4b4o$b3o25b
+o3bo3bo4b2ob2o$30bo6bo6b2o$26bo3bo5bo$27b4o$19bo2b3o33bo$18b2o2bobo34b
+o6b2o$19bo2b3o30bo3bo4b2ob2o$27b4o25b4o4b4o$26bo3bo34b2o$30bo$29bo$64b
+o$17b4o43b2o$16bo3bo37b2o3bob2o$20bo37bo4bobo$19bo43b2o4$66b2o$64b2ob
+2o12bo$48b2o14b4o14bo$46b2ob2o14b2o11bo3bo$46b4o29b4o13b4o$47b2o46bo3b
+o$40b2o57bo$39b4o55bo$39b2ob2o$41b2o29bo13b2o$34bobo33bobo13bo9bo$33b
+o2b2o33b2o8bo15bo$34bobo43b3o14bo$41b2o6b5o25b2o15b2o$39b2ob2o4bo4bo13b
+o15b2o10bo$39b4o10bo11bobo$40b2o10bo13b2o8bo$77bo$73bo3bo11b2o5b4o$74b
+4o9b2ob2o3bo3bo$65b2o2b3o15b4o8bo$59bo5b2o2bobo16b2o8bo$59bo5b2o2b3o$
+59bo14b4o$73bo3bo$77bo$76bo3$78bo$79bo$75bo3bo$61bo14b4o$61bo5b2o2b3o
+$61bo5b2o2bobo16b2o8bo$67b2o2b3o15b4o8bo$76b4o9b2ob2o3bo3bo$75bo3bo11b
+2o5b4o$79bo$42b2o10bo13b2o8bo$41b4o10bo11bobo$41b2ob2o4bo4bo13bo15b2o
+10bo$43b2o6b5o25b2o15b2o$36bobo43b3o14bo$35bo2b2o33b2o8bo15bo$36bobo33b
+obo13bo9bo$43b2o29bo13b2o$41b2ob2o$41b4o55bo$42b2o57bo$49b2o46bo3bo$48b
+4o29b4o13b4o$48b2ob2o14b2o11bo3bo$50b2o14b4o14bo$66b2ob2o12bo$68b2o4$
+21bo43b2o$22bo37bo4bobo$18bo3bo37b2o3bob2o$19b4o43b2o$66bo2$33b2o$31b
+2ob2o31b2o$27bo3b4o23b4o4b4o$28bo3b2o23bo3bo4b2ob2o$26bo2bo31bo6b2o$28b
+o3b2o26bo$27bo3b4o$31b2ob2o$33b2o5b2o5b4o$5b3o30b2ob2o3bo3bo$4b5o29b4o
+8bo$4b3ob2o29b2o8bo$7b2o4$44b3o2b2o$46bob2o$22b3o20bo4bo$24bo$23bo2$47b
+4o$32bo13bo3bo$33bo16bo$29bo3bo15bo$30b4o!
