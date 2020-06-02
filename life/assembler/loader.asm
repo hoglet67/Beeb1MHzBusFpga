@@ -1,10 +1,5 @@
-org &1900
-
-guard &3000
-
 include "constants.asm"
 
-.start
         LDA #'0'
         STA drive
 
@@ -34,7 +29,7 @@ include "constants.asm"
         LDA reg_version_maj
         CMP #VERSION_EXPECTED
         BNE hardware_incompatible
-        JMP initialize
+        JMP hardware_compatible
 
 .hardware_incompatible
         JSR print_string
@@ -54,7 +49,7 @@ include "constants.asm"
         JSR print_hex2
         JMP OSNEWL
 
-.initialize
+.hardware_compatible
         ;; Initialize the control defaukts
         LDA #0
         STA reg_control
@@ -63,28 +58,8 @@ include "constants.asm"
         ;; Disable the scaler
         JSR reset_scaler
 
-        ;; Set the cursor keys to return &87-&8B
-        LDA #&04
-        LDX #&02
-        LDY #&00
-        JSR OSBYTE
-
-        ;; Set function keys to return &80+n
-        LDA #&E1
-        LDX #&80
-        LDY #&00
-        JSR OSBYTE
-
-        ;; Set shift-function keys to return &90+n
-        LDA #&E2
-        LDX #&90
-        LDY #&00
-        JSR OSBYTE
-
-        ;; Flush any junk from the keyboard buffer
-        LDA #&15
-        LDX #&00
-        JSR OSBYTE
+        ;; Initialize the atom/beeb specific code
+        JSR initialize
 
         ;; Show something nice while indexing RLE files
         LDA #1
@@ -113,8 +88,8 @@ include "constants.asm"
 
 .main
 {
+        JSR clear_display
         JSR print_string
-        EQUS 22, 0
         EQUS "Conway's Life on the HD Life FPGA at "
         NOP
         LDA reg_x_size
@@ -152,8 +127,6 @@ include "constants.asm"
         ORA #'0'
         JSR OSWRCH
 
-        JSR disable_cursor
-
         JSR display_status
 
         JSR print_string
@@ -173,12 +146,11 @@ include "constants.asm"
 .prompt
         JSR display_status
 
-        JSR print_string
-        EQUS 31,71,31,32,127
-        NOP
-
 .wait_for_key
+
         JSR update_counts
+
+        JSR tab_to_prompt
 
         JSR read_key
         BCS wait_for_key
@@ -256,18 +228,18 @@ include "constants.asm"
         JMP prompt
 
 .not_dot
-        CMP #'Z'
-        BNE not_z
+        CMP #'['
+        BNE not_zin
         JSR zoom_inc
         JMP prompt
 
-.not_z
-        CMP #'X'
-        BNE not_x
+.not_zin
+        CMP #']'
+        BNE not_zout
         JSR zoom_dec
         JMP prompt
 
-.not_x
+.not_zout
         ;; Shift Left - decrease pan X speed
         CMP #&9C
         BNE not_shift_left
@@ -340,15 +312,6 @@ include "constants.asm"
 
 ;; Conway's Life on the HD Life Engine with 8 pipeline stages               Drive=0
 ;; Generation=123456  Cells=123456  X=0000,Y=0000  Zoom=Off  Speed=8x  Msk=0  Brd=1
-
-.disable_cursor
-{
-        JSR print_string
-.vdu
-        EQUB 23,1,0,0,0,0,0,0,0,0
-        NOP
-        RTS
-}
 
 .update_counts
 {
@@ -466,77 +429,6 @@ include "constants.asm"
         EQUS "fxxx6"
 .zoom_table2
         EQUS "f   x"
-}
-
-
-.display_prompt
-{
-        JSR print_string
-        EQUS 31,0,30,"CURSOR/TAB/COPY=pan, Z/X=zoom, SPACE=stop/start, RETURN=step, <>=speed", 10, 13
-        EQUS "0-3=drive, F0=clear, F1-3=random, F4=mask, F5=border, A-"
-        NOP
-
-        LDA last_pattern
-        JSR OSWRCH
-
-        JSR print_string
-        EQUS "=load pattern:"
-        NOP
-        RTS
-}
-
-.read_key
-{
-        BIT &FF
-        BMI escape
-        LDA #&80
-        LDX #&FF
-        JSR OSBYTE
-        CPX #&00
-        BEQ exitc1
-        JSR OSRDCH
-        BCS escape
-        CMP #&20
-        BCC exitc0
-        CMP #&7F
-        BCS exitc0
-        JSR OSWRCH
-.exitc0
-        CLC
-        RTS
-
-.exitc1
-        SEC
-        RTS
-
-.escape
-        LDA #&7E
-        JSR OSBYTE
-        LDA #&E1
-        LDX #&01
-        LDY #&00
-        JSR OSBYTE
-        LDA #&04
-        LDX #&00
-        LDY #&00
-        JSR OSBYTE
-        LDA #22
-        JSR OSWRCH
-        LDA #7
-        JSR OSWRCH
-        LDX #<cmd1
-        LDY #>cmd1
-        JSR OSCLI
-        LDX #<cmd2
-        LDY #>cmd2
-        JSR OSCLI
-        PLA
-        PLA
-        RTS
-.cmd1
-        EQUS "DRIVE 0", 13
-.cmd2
-        EQUS "DIR $", 13
 }
 
 .engine_start
@@ -896,7 +788,3 @@ include "rle_utils.asm"
 include "utils.asm"
 
 include "indexer.asm"
-
-.end
-
-SAVE "", start, end

@@ -6,7 +6,7 @@ else
     RELEASE=$1
 fi
 
-NAME=beeb_fpga_life_$RELEASE
+NAME=hdlife_$RELEASE
 
 DIR=releases/$NAME
 
@@ -18,8 +18,8 @@ mkdir -p $DIR
 # Build the software
 ./build.sh
 
-# Copy the softwate to the release directory
-build=build
+# Copy the Beeb software to the release directory
+build=build/beeb
 ssd=fpgalife
 for i in 0 1 2 3
 do
@@ -27,7 +27,12 @@ do
     beeb info ${build}/${ssd}${i}.ssd
     cp ${build}/${ssd}${i}.ssd $DIR
 done
-cp ${build}/loader.log $DIR
+
+# Copy the Beeb software to the release directory
+build=build/atom
+pushd ${build}
+zip -qr ../../${DIR}/atom.zip `find . -type f | sort`
+popd
 
 # Build each of the Xilinx designs (different resolutions)
 

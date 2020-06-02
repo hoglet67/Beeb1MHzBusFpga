@@ -5,33 +5,74 @@
 # 1. BeebASM - https://github.com/stardot/beebasm
 # 2. MMB/SSD Utils in Perl - https://github.com/sweharris/MMB_Utils
 
-build=build
+# Set the BEEBASM executable for the platform
+BEEBASM=beebasm
+
+##############################################################
+## Build the Atom Version
+##############################################################
+
+build=build/atom
 
 rm -rf ${build}
 mkdir -p ${build}
 
-# Set the BEEBASM executable for the platform
-BEEBASM=beebasm
+
+cd assembler
+for top in atom_top.asm
+do
+    name=HDLIFE
+    echo "Building $build/$name..."
+
+    # Assember the program
+    $BEEBASM -i ${top} -o ../${build}/${name} -v >& ../${build}/${name}.log
+
+    # Check if program has been built, otherwise fail early
+    if [ ! -f ../${build}/${name} ]
+    then
+        cat ../${build}/${name}.log
+        echo "build failed to create ${name}"
+        exit
+    fi
+
+done
+cd ..
+
+# Add the patterns
+for i in 0 1 2 3
+do
+    mkdir ${build}/${i}
+    cp patterns${i}/* ${build}/${i}
+done
+
+##############################################################
+## Build the Beeb Version
+##############################################################
+
+build=build/beeb
+
+rm -rf ${build}
+mkdir -p ${build}
 
 ssd=fpgalife
 
 # Create a blank SSD images
 for i in 0 1 2 3
 do
-    beeb blank_ssd build/${ssd}${i}.ssd
+    beeb blank_ssd ${build}/${ssd}${i}.ssd
 done
 echo
 
 cd assembler
-for top in loader.asm
+for top in beeb_top.asm
 do
-    name=`echo ${top%.asm}`
-    echo "Building $name..."
+    name=HDLIFE
+    echo "Building $build/$name..."
 
-    # Assember the ROM
+    # Assember the program
     $BEEBASM -i ${top} -o ../${build}/${name} -v >& ../${build}/${name}.log
 
-    # Check if ROM has been build, otherwise fail early
+    # Check if program has been built, otherwise fail early
     if [ ! -f ../${build}/${name} ]
     then
         cat ../${build}/${name}.log
@@ -45,11 +86,6 @@ do
     # Add into SSD 0
     beeb putfile ../${build}/${ssd}0.ssd ../${build}/${name}
 
-    # Report end of code
-    grep "code ends at" ../${build}/${name}.log
-
-    # Report build checksum
-    echo "    mdsum is "`md5sum <../${build}/${name}`
 done
 cd ..
 
@@ -74,7 +110,7 @@ do
 done
 
 # Create the !boot file
-echo -e -n "*RUN LOADER\r" > ${build}/\!BOOT
+echo -e -n "*RUN HDLIFE\r" > ${build}/\!BOOT
 
 # Add into the SSD
 beeb putfile ${build}/${ssd}0.ssd ${build}/\!BOOT
