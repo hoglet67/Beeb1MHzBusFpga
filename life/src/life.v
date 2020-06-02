@@ -1037,7 +1037,7 @@ module life (
    assign scaler_x_next = scaler_x_origin + {{(3+SFB){scaler_x_speed[7]}}, scaler_x_speed};
    assign scaler_y_next = scaler_y_origin + {{(3+SFB){scaler_y_speed[7]}}, scaler_y_speed};
 
-   always @(negedge clke or negedge rst_n) begin
+   always @(negedge clke) begin
       if (!rst_n) begin
          selected    <= 1'b0;
          selected_rr <= 1'b0;
