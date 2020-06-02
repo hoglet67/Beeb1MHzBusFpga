@@ -278,6 +278,9 @@
 .exdone
         LDA #&0D
         STA filenames, X    ; Overwrite the zero length byte with a &0D terminator
+        LDA #&00
+        STA nameptr_lo, Y   ; Add a null terminator to the array of filename pointers
+        STA nameptr_hi, Y
         RTS
 
 }
