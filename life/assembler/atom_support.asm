@@ -2,129 +2,21 @@ ALIGN 256
 
 .filenames
 
-.file0
-    EQUS    "49768M", 13
-
-.file1
-    EQUS    "ACORN", 13
-
-.file2
-    EQUS    "BLSHIP1", 13
-
-.file3
-    EQUS    "BLSTACK", 13
-
-.file4
-    EQUS    "BREEDR1", 13
-
-.file5
-    EQUS    "BREEDR2", 13
-
-.file6
-    EQUS    "BUNN9", 13
-
-.file7
-    EQUS    "DIEHARD", 13
-
-.file8
-    EQUS    "FERPRIM", 13
-
-.file9
-    EQUS    "FLYWING", 13
-
-.file10
-    EQUS    "GLIDER", 13
-
-.file11
-    EQUS    "HALFMAX", 13
-
-.file12
-    EQUS    "IGHOTEL", 13
-
-.file13
-    EQUS    "NOAHARK", 13
-
-.file14
-    EQUS    "P160DRT", 13
-
-.file15
-    EQUS    "PISHIP1", 13
-
-.file16
-    EQUS    "PUFF", 13
-
-.file17
-    EQUS    "RABBITS", 13
-
-.file18
-    EQUS    "RPENTO", 13
-
-.file19
-    EQUS    "SIRROBN", 13
-
-.file20
-    EQUS    "SPACE", 13
-
-.file21
-    EQUS    "STARGTE", 13
-
-.file22
-    EQUS    "TWINPRI", 13
+SKIP 256
 
 .arrlo
 .nameptr_lo
-    EQUB <file0
-    EQUB <file1
-    EQUB <file2
-    EQUB <file3
-    EQUB <file4
-    EQUB <file5
-    EQUB <file6
-    EQUB <file7
-    EQUB <file8
-    EQUB <file9
-    EQUB <file10
-    EQUB <file11
-    EQUB <file12
-    EQUB <file13
-    EQUB <file14
-    EQUB <file15
-    EQUB <file16
-    EQUB <file17
-    EQUB <file18
-    EQUB <file19
-    EQUB <file20
-    EQUB <file21
-    EQUB <file22
-    EQUB 0
+
+SKIP 64
 
 .arrhi
 .nameptr_hi
-    EQUB >file0
-    EQUB >file1
-    EQUB >file2
-    EQUB >file3
-    EQUB >file4
-    EQUB >file5
-    EQUB >file6
-    EQUB >file7
-    EQUB >file8
-    EQUB >file9
-    EQUB >file10
-    EQUB >file11
-    EQUB >file12
-    EQUB >file13
-    EQUB >file14
-    EQUB >file15
-    EQUB >file16
-    EQUB >file17
-    EQUB >file18
-    EQUB >file19
-    EQUB >file20
-    EQUB >file21
-    EQUB >file22
-    EQUB 0
 
+SKIP 64
+
+.d_filename
+
+SKIP 32
 
 ;; ************************************************************
 ;; initialize
@@ -132,14 +24,7 @@ ALIGN 256
 
 .initialize
 {
-        LDX #0
-.loop
-        LDA star_cwd_n, X
-        STA &0100,X
-        INX
-        CMP #&0D
-        BNE loop
-        JMP OSCLI
+        RTS
 }
 
 ;; ************************************************************
@@ -239,12 +124,12 @@ ALIGN 256
         ;; Correct to ASCII by adding &20
         CLC
         ADC #&20
-        ;; Map 0-9 to F0-F9
-        CMP #'0'
+        ;; Map 4-9 (&34-&39) to F0-F5 (&80-&85)
+        CMP #'4'
         BCC exit
         CMP #'9' + 1
         BCS exit
-        ADC #&50
+        ADC #&4C
 .exit
         RTS
 }
@@ -288,7 +173,7 @@ ALIGN 256
 {
         JSR print_string
         EQUS 31,0,38,"CURSOR/LOCK/COPY=pan, []=zoom, SPACE=stop/start, RETURN=step, <>=speed", 10, 13
-        EQUS "0=clear, 1-3=random, 4=mask, 5=border, A-"
+        EQUS "0-3=drive, 4=clear, 5-7=random, 8=mask, 9=border, A-"
         NOP
 
         LDA last_pattern
@@ -306,7 +191,7 @@ ALIGN 256
 .tab_to_prompt
 {
         JSR print_string
-        EQUS 31,56,39,32,127
+        EQUS 31,67,39,32,127
         NOP
         RTS
 }
@@ -326,23 +211,121 @@ ALIGN 256
 ;; ************************************************************
 
 ;; Select the drive/directory
-;; L oad pointers to the filenames into nameptr_lo, nameptr_hi
+;; Load pointers to the filenames into nameptr_lo, nameptr_hi
 ;; Return with Y = number of filenames
 .read_current_directory
 {
-    LDY #(nameptr_hi - nameptr_lo - 1)
-    RTS
+        ;; Save the old value of OSWRCH
+        LDA WRCVEC
+        PHA
+        LDA WRCVEC + 1
+        PHA
+
+        ;; Update OSWRCH to point to capture_cat
+        LDA #<capture_cat
+        STA WRCVEC
+        LDA #>capture_cat
+        STA WRCVEC + 1
+
+        ;; Initialize all the working variables
+        LDX #0
+        STX file_count
+        STX file_ptr
+        STX file_base
+        STX file_state
+
+        ;; *CAT <N>
+.loop
+        LDA star_cat_n, X
+        STA &0100,X
+        INX
+        CMP #&0D
+        BNE loop
+        JSR OSCLI
+
+        ;; Restore the old value of WRCVEC
+        PLA
+        STA WRCVEC + 1
+        PLA
+        STA WRCVEC
+
+        ;; Load return values
+        LDY file_count
+        LDA #0
+        STA nameptr_lo, Y
+        STA nameptr_hi, Y
+        RTS
 }
 
-.star_cwd_n
-        EQUB "CWD "
+;; Currently this uses a 256b block of memory for filenames
+;; (i.e. keep the number of files per RLE folder less than 32)
+.capture_cat
+{
+        PHA
+        TXA
+        PHA
+        TSX
+        LDA &0102,X
+
+        ;; Always ignore line feed
+        CMP #&0A
+        BEQ exit
+
+        BIT file_state
+        BMI skipping
+
+        ;; If we encounter a < character skip this as a directory
+        CMP #'<'
+        BEQ skip_directory
+
+        ;; Save the filename
+        LDX file_ptr
+        STA filenames, X
+        INX
+        STX file_ptr
+
+        ;; Have we reached the end?
+        CMP #&0D
+        BNE exit
+
+        ;; Add the filename into the list
+        LDX file_count
+        LDA file_base
+        STA nameptr_lo, X
+        LDA #>filenames
+        STA nameptr_hi, X
+        INX
+        STX file_count
+        LDX file_ptr
+        STX file_base
+        BNE exit
+
+.skip_directory
+        LDA #&80
+        STA file_state
+
+.skipping
+        CMP #&0D
+        BNE exit
+        LDA #&00
+        STA file_state
+
+.exit
+        PLA
+        TAX
+        PLA
+        RTS
+}
+
+.star_cat_n
+        EQUS "CAT "
 
 ;; ************************************************************
-;; current drive
+;; Current "drive"
 ;; ************************************************************
 
 .drive
-        EQUB "0", 13
+        EQUS "0", 13
 
 ;; ************************************************************
 ;; OSFIND
@@ -359,8 +342,30 @@ ALIGN 256
     EOR #&80
     ASL A
 
+    PHA
+
+    ;; Construct a file name with the RLE folder pre-pended
+    ;; e.g. 0/NOAHARK
     STX osfind_block
-    STY osfind_block+1
+    STY osfind_block + 1
+    LDA drive
+    STA d_filename
+    LDA #'/'
+    STA d_filename + 1
+    LDY #0
+.loop
+    LDA (osfind_block), Y
+    STA d_filename + 2, Y
+    INY
+    CMP #&0D
+    BNE loop
+
+    LDA #<d_filename
+    STA osfind_block
+    LDA #>d_filename
+    STA osfind_block + 1
+
+    PLA
 
     LDX #osfind_block
     JMP OSFIND_ATOM
