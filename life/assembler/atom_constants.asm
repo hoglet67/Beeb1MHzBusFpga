@@ -2,6 +2,8 @@ base_fred       = &B600
 
 base_jim        = &B700
 
+godil           = &BDE0
+
 base_zp         = &70
 
 OSFIND_ATOM     = &FFCE
@@ -12,7 +14,6 @@ OSASCI          = &FFE9
 OSNEWL          = &FFED
 OSWRCH          = &FFF4
 OSCLI           = &FFF7
-
 
 WRCVEC          = &0208
 

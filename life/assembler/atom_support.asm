@@ -24,6 +24,32 @@ SKIP 32
 
 .initialize
 {
+        ;; Check for the GODIL
+        LDA godil + &0F
+        AND #&F0
+        CMP #&10
+        BNE bad1
+
+        ;; Check for VGA80 mode
+        LDA godil + &00
+        BPL bad2
+
+        RTS
+
+.bad1
+        JSR print_string
+        EQUS "ERROR: GODIL REQUIRED", 13
+        NOP
+        PLA
+        PLA
+        RTS
+
+.bad2
+        JSR print_string
+        EQUS "ERROR: GODIL VGA80 MODE REQUIRED", 13
+        NOP
+        PLA
+        PLA
         RTS
 }
 
