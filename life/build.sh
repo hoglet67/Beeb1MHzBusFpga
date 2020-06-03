@@ -12,7 +12,7 @@ BEEBASM=beebasm
 ## Build the Atom Version
 ##############################################################
 
-build=build/atom
+build=build/atom/LIFE
 
 rm -rf ${build}
 mkdir -p ${build}
@@ -21,7 +21,7 @@ mkdir -p ${build}
 cd assembler
 for top in atom_top.asm
 do
-    name=HDLIFE
+    name=LIFE
     echo "Building $build/$name..."
 
     # Assember the program
@@ -66,7 +66,7 @@ echo
 cd assembler
 for top in beeb_top.asm
 do
-    name=HDLIFE
+    name=LIFE
     echo "Building $build/$name..."
 
     # Assember the program
@@ -110,7 +110,7 @@ do
 done
 
 # Create the !boot file
-echo -e -n "*RUN HDLIFE\r" > ${build}/\!BOOT
+echo -e -n "*RUN LIFE\r" > ${build}/\!BOOT
 
 # Add into the SSD
 beeb putfile ${build}/${ssd}0.ssd ${build}/\!BOOT

@@ -6,7 +6,7 @@ else
     RELEASE=$1
 fi
 
-NAME=hdlife_$RELEASE
+NAME=beeb_fpga_life_$RELEASE
 
 DIR=releases/$NAME
 
