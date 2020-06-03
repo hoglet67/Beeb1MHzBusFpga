@@ -316,13 +316,13 @@ include "constants.asm"
 .update_counts
 {
 
+        ;; Update generation count
         LDA #31
         JSR OSWRCH
         LDA #11
         JSR OSWRCH
         LDA #2
         JSR OSWRCH
-        ;; Update generation count
         LDA reg_gens
         STA num
         LDA reg_gens + 1
@@ -333,13 +333,13 @@ include "constants.asm"
         ;; Print 6 digits
         JSR PrDec20
 
+        ;; Update cells count
         LDA #31
         JSR OSWRCH
         LDA #25
         JSR OSWRCH
         LDA #2
         JSR OSWRCH
-        ;; Update cells count
         LDA reg_cells
         STA num
         LDA reg_cells + 1
@@ -349,8 +349,42 @@ include "constants.asm"
         STA num + 2
         ;; Print 6 digits
         JSR PrDec20
-        RTS
 
+        ;; Update x offset
+        LDA #31
+        JSR OSWRCH
+        LDA #35
+        JSR OSWRCH
+        LDA #2
+        JSR OSWRCH
+        LDA reg_scaler_x_origin
+        STA num
+        LDA reg_scaler_x_origin + 1
+        LSR A
+        ROR num
+        LSR A
+        ROR num
+        STA num + 1
+        ;; Print 4 digits
+        JSR PrDec12
+
+        ;; Update y offset
+        LDA #31
+        JSR OSWRCH
+        LDA #42
+        JSR OSWRCH
+        LDA #2
+        JSR OSWRCH
+        LDA reg_scaler_y_origin
+        STA num
+        LDA reg_scaler_y_origin + 1
+        LSR A
+        ROR num
+        LSR A
+        ROR num
+        STA num + 1
+        ;; Print 4 digits
+        JMP PrDec12
 }
 
 .display_status
@@ -360,32 +394,8 @@ include "constants.asm"
         EQUS 31,  0, 2, "Generation="
         EQUS 31, 17, 2, "  Cells="
         EQUS 31, 31, 2, "  X="
-        NOP
-        LDA reg_scaler_x_origin
-        STA num
-        LDA reg_scaler_x_origin + 1
-        LSR A
-        ROR num
-        LSR A
-        ROR num
-        STA num + 1
-        JSR PrDec12
-
-        JSR print_string
-        EQUS ",Y="
-        NOP
-        LDA reg_scaler_y_origin
-        STA num
-        LDA reg_scaler_y_origin + 1
-        LSR A
-        ROR num
-        LSR A
-        ROR num
-        STA num + 1
-        JSR PrDec12
-
-        JSR print_string
-        EQUS "  Zoom="
+        EQUS 31, 39, 2, ",Y="
+        EQUS 31, 46, 2, "  Zoom="
         NOP
         LDX reg_scaler_zoom
         LDA zoom_table0, X
@@ -419,9 +429,7 @@ include "constants.asm"
         NOP
         LDA reg_control
         AND #ctrl_border
-        JSR print_boolean
-
-        RTS
+        JMP print_boolean
 
 .zoom_table0
         EQUS "O2481"
